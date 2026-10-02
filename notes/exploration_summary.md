@@ -70,7 +70,11 @@ what is re-prefilled, and the price card decides whether reuse is passed on to t
    - The real piece sequence used to depend on how much an agent simulated: beam and greedy saw
      different pieces from index 2 on the same seed. It is now a function of the episode seed only,
      with non-clairvoyant simulation clones. Tests: `tests/test_env_rng.py`.
-   - The v1 diffusion config, before vs after the fix: __BEFORE_AFTER__
+   - The v1 diffusion config (mask+heuristic, K=64, H=8, 100 episodes; same freshly trained
+     checkpoint; 50-piece cap on CPU), before vs after the fix: mean score **23.90 [21.92, 25.99] vs
+     24.12 [22.32, 26.04]**. The bug did not bias v1-style means. It made them unreproducible: the
+     eval runner never seeded the global stream, and simulations consumed it. It also made paired
+     agent comparisons impossible. Details: `runs/explore/phase1_rng_fix/`.
 
 Decision-quality yardstick (same oracle, seeds 1000–1002): beam search (H=3, W=16) has regret
 0.12/decision and top-1 agreement 54%. Greedy has 0.21 and 46%. The best LLM configuration is

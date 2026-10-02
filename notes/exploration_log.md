@@ -9,6 +9,19 @@ Spend ledger: `runs/explore/spend.csv` (hard cap $25 total, $5 per iteration).
 Normalized score: 0 = random legal policy, 1 = `beam_search_planner` default (H=3, W=16), on the
 same seeds and piece budget (`runs/explore/reference_scores.csv`).
 
+## Phase 1 (environment fix) result
+
+The v1 diffusion config (mask+heuristic, K=64, H=8) was run on the same checkpoint before and after
+the piece-RNG fix: 100 episodes each, capped at 50 pieces on CPU.
+
+| run | mean score | 95% CI |
+|:--|--:|:--|
+| before | 23.90 | [21.92, 25.99] |
+| after | 24.12 | [22.32, 26.04] |
+
+There is no bias in the mean. The fix is about reproducibility and pairing: identical piece sequences
+per episode seed, whatever the agent simulates. See `runs/explore/phase1_rng_fix/`.
+
 ---
 
 ## Iteration 1: history policies vs KV-cache reuse (gpt-oss-20b)
