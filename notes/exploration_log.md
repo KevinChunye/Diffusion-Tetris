@@ -378,3 +378,20 @@ oracle; the yardstick is beam 0.12 and greedy 0.21.
 Rubric: (1) gemma's regret and cost advantage over GLM/Qwen/DeepSeek is far beyond seed noise; the
 latency and cost of reasoning are deterministic. (2) One figure. (3) Cost, latency and decode.
 (4) $0.86 per ladder. This was the last iteration. See `notes/exploration_summary.md`.
+
+---
+
+## Spend ledger (from `runs/explore/spend.csv`; iteration 0 = Phase 0 probe + smoke tests)
+
+|   iteration |   runs |   calls |   cost_usd |   cumulative_usd |
+|------------:|-------:|--------:|-----------:|-----------------:|
+|           0 |      2 |     298 |      0.435 |            0.435 |
+|           1 |      2 |    1089 |      0.131 |            0.566 |
+|           2 |      1 |    1999 |      0.869 |            1.435 |
+|           3 |      1 |     150 |      0.928 |            2.363 |
+|           4 |      8 |     282 |      0.844 |            3.207 |
+|           5 |      1 |     324 |      0.268 |            3.474 |
+|           6 |      2 |    3799 |      1.701 |            5.176 |
+
+Total **$5.18** of the $25 cap. Every iteration stayed under its $5 cap; the largest was
+iteration 6 at $1.70, including the throttled first attempt.
