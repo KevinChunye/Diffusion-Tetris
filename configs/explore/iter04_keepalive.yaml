@@ -1,0 +1,11 @@
+# Iteration 4C: keep-alive under load. 16 concurrent DeepSeek contexts, 60 s idle;
+# half re-send their prefix every 4 s (max_tokens=1), half stay silent.
+iteration: 4
+name: lifetime_keepalive_load16
+history_turns: 24
+stagger_s: 0.3
+rewarm_connection: true
+budget_usd: 0.6
+experiments:
+  - {model: deepseek-ai/DeepSeek-V4-Flash, gaps_s: [60], trials: 8, keepalive_s: 4, tag: keepalive4s}
+  - {model: deepseek-ai/DeepSeek-V4-Flash, gaps_s: [60], trials: 8, tag: silent}

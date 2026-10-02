@@ -1,0 +1,3 @@
+model,gap_s,trial,tag,keepalive_s,pings,ping_cost_usd,prompt_warm,cached_warm,latency_warm,prompt_probe,cached_probe,latency_probe,vllm_cached_probe,lmcache_cached_probe,actual_gap_s,ok,error,cost_usd
+deepseek-ai/DeepSeek-V4-Flash,30.0,0,load1,0,0,0.0,13920,0,3.9316951589999007,14809,13824,0.4048612349997711,,,30.06035280227661,True,,0.004022620000000001
+openai/gpt-oss-20b,30.0,0,load1,0,0,0.0,14120,64,1.1135718559999077,15012,14112,0.16098284700001386,0.0,0.0,30.10184669494629,True,,0.00104748

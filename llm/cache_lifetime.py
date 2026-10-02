@@ -84,44 +84,72 @@ def main() -> None:
     final_user = history[-1]
     past = history[:-1]
     settings = load_model_settings()
-    gaps = [float(g) for g in cfg["gaps_s"]]
-    jobs = [(m, g, r) for r in range(int(cfg["trials"])) for g in gaps for m in cfg["models"]]
+    experiments = cfg.get("experiments") or [{"model": m, "gaps_s": cfg["gaps_s"], "trials": cfg["trials"]}
+                                             for m in cfg["models"]]
+    rewarm = bool(cfg.get("rewarm_connection", False))
+    # A "lane" runs its jobs one after another (sequential experiments); other jobs get a lane each.
+    lanes: List[List[tuple]] = []
+    for e in experiments:
+        jobs_e = [(e["model"], float(g), r, e.get("tag", ""), e.get("keepalive_s"))
+                  for r in range(int(e.get("trials", 3))) for g in e["gaps_s"]]
+        if e.get("sequential"):
+            lanes.append(jobs_e)
+        else:
+            lanes.extend([[j] for j in jobs_e])
     rows: List[Dict[str, Any]] = []
     lock = threading.Lock()
     stagger = float(cfg.get("stagger_s", 1.0))
 
-    def one(i_job):
-        i, (model, gap, trial) = i_job
-        time.sleep(i * stagger)
+    def trial(job) -> None:
+        model, gap, trial_idx, tag, keepalive_s = job
         if client.total_cost_usd >= cap:
             return
         nonce = uuid.uuid4().hex
         sys_msg = {"role": "system", "content": f"Session {nonce}.\n" + system_prompt()}
         kw = dict(settings.get(model, {}))
-        meta = {"model": model, "gap_s": gap, "trial": trial}
+        meta = {"model": model, "gap_s": gap, "trial": trial_idx, "tag": tag}
         warm = client.chat(model, [sys_msg] + past, max_tokens=1, stream=False, meta=dict(meta, call="warmup"), **kw)
         t_warm_end = time.time()
+        pings, ping_cost = 0, 0.0
+        if keepalive_s:
+            while time.time() - t_warm_end + float(keepalive_s) < gap:
+                time.sleep(float(keepalive_s))
+                pr = client.chat(model, [sys_msg] + past, max_tokens=1, stream=False, meta=dict(meta, call="keepalive"), **kw)
+                pings += 1
+                ping_cost += pr.cost_usd
         time.sleep(max(0.0, gap - (time.time() - t_warm_end)))
+        if rewarm and hasattr(client, "list_models"):
+            try:
+                client.list_models()  # re-open the pooled HTTP connection so the probe measures the server
+            except Exception:
+                pass
         probe = client.chat(model, [sys_msg] + past + [final_user], max_tokens=1, stream=False,
                             meta=dict(meta, call="after_gap"), **kw)
-        row = dict(meta, prompt_warm=warm.prompt_tokens, cached_warm=warm.cached_tokens, latency_warm=warm.latency_s,
+        row = dict(meta, keepalive_s=keepalive_s or 0, pings=pings, ping_cost_usd=ping_cost,
+                   prompt_warm=warm.prompt_tokens, cached_warm=warm.cached_tokens, latency_warm=warm.latency_s,
                    prompt_probe=probe.prompt_tokens, cached_probe=probe.cached_tokens, latency_probe=probe.latency_s,
                    vllm_cached_probe=probe.vllm_cached_tokens, lmcache_cached_probe=probe.lmcache_cached_tokens,
                    actual_gap_s=probe.t_start - t_warm_end, ok=warm.ok and probe.ok,
-                   error=(warm.error or probe.error)[:200], cost_usd=warm.cost_usd + probe.cost_usd)
+                   error=(warm.error or probe.error)[:200], cost_usd=warm.cost_usd + probe.cost_usd + ping_cost)
         with lock:
             rows.append(row)
-        print(f"[lifetime] {model.split('/')[-1]:>22s} gap {gap:6.0f}s trial {trial}: warm {warm.latency_s:5.2f}s "
+        print(f"[lifetime] {model.split('/')[-1]:>22s} {tag:>12s} gap {gap:6.0f}s trial {trial_idx}: warm {warm.latency_s:5.2f}s "
               f"(cached {warm.cached_tokens}) -> probe {probe.latency_s:5.2f}s cached {probe.cached_tokens}/{probe.prompt_tokens} "
-              f"[vllm {probe.vllm_cached_tokens} lmc {probe.lmcache_cached_tokens}]", flush=True)
+              f"[vllm {probe.vllm_cached_tokens} lmc {probe.lmcache_cached_tokens}] pings {pings}", flush=True)
+
+    def lane(i_lane):
+        i, jobs_l = i_lane
+        time.sleep(i * stagger)
+        for job in jobs_l:
+            trial(job)
 
     t0 = time.time()
-    with ThreadPoolExecutor(max_workers=len(jobs)) as ex:
-        list(ex.map(one, list(enumerate(jobs))))
+    with ThreadPoolExecutor(max_workers=len(lanes)) as ex:
+        list(ex.map(lane, list(enumerate(lanes))))
     cost = float(client.total_cost_usd)
     if not args.mock:
-        record_spend(cfg["iteration"], cfg.get("name", ""), cost, 2 * len(rows))
-    pd.DataFrame(rows).sort_values(["model", "gap_s", "trial"]).to_csv(os.path.join(out_dir, "lifetime.csv"), index=False)
+        record_spend(cfg["iteration"], cfg.get("name", ""), cost, int(sum(2 + r["pings"] for r in rows)))
+    pd.DataFrame(rows).sort_values(["model", "tag", "gap_s", "trial"]).to_csv(os.path.join(out_dir, "lifetime.csv"), index=False)
     print(f"[lifetime] {len(rows)} trials, {time.time() - t0:.0f}s, ${cost:.4f}")
 
 

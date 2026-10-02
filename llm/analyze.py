@@ -253,10 +253,18 @@ def capacity_tables(d: str):
         x["phase"] = os.path.basename(os.path.dirname(f))
         parts.append(x)
     lt = pd.concat(parts, ignore_index=True)
-    lt["hit"] = (lt["cached_probe"] > 0.5 * lt["prompt_probe"]) | (lt["latency_probe"] < 0.3 * lt["latency_warm"])
     lt["reported_hit"] = lt["cached_probe"] > 0.5 * lt["prompt_probe"]
-    load = lt[lt["phase"].str.startswith("load")].copy()
-    load["contexts"] = load["phase"].str.replace("load", "").astype(int)
+    # Use reported cached tokens wherever a model reports them. Only for models that never report
+    # (GLM) fall back to latency vs that model's sequential cold prefill, because queued warm-ups
+    # make warm latency a bad baseline under load.
+    reports = lt.groupby("model")["cached_probe"].max().gt(0).rename("reports_cache")
+    lt = lt.join(reports, on="model")
+    cold_ref = lt[lt["phase"].isin(["glm", "isolated", "load1"])].groupby("model")["latency_warm"].median().rename("cold_ref")
+    lt = lt.join(cold_ref, on="model")
+    lt["hit"] = lt["reported_hit"].where(lt["reports_cache"], lt["latency_probe"] < 0.3 * lt["cold_ref"])
+    # One context at a time (the isolated control at the same 30 s gap) is the N=1 point too.
+    load = lt[lt["phase"].str.startswith("load") | ((lt["phase"] == "isolated") & (lt["gap_s"] == 30))].copy()
+    load["contexts"] = load["phase"].str.replace("load", "").replace("isolated", "1").astype(int)
     cap = load.groupby(["model", "contexts"]).agg(
         trials=("trial", "size"), hit_rate=("hit", "mean"), probe_p50=("latency_probe", "median"),
         warm_p50=("latency_warm", "median"), warm_max=("latency_warm", "max")).reset_index()

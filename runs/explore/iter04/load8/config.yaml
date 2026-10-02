@@ -1,0 +1,17 @@
+iteration: 4
+name: lifetime_load8
+history_turns: 24
+stagger_s: 0.3
+rewarm_connection: true
+budget_usd: 0.4
+experiments:
+- model: deepseek-ai/DeepSeek-V4-Flash
+  gaps_s:
+  - 30
+  trials: 8
+  tag: load8
+- model: openai/gpt-oss-20b
+  gaps_s:
+  - 30
+  trials: 8
+  tag: load8

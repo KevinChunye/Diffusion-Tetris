@@ -226,3 +226,65 @@ platform could publish, and a client could respect by capping concurrency or kee
 Same 24-turn Tetris prefix as iteration 3. The HTTP connection is re-warmed before every probe.
 
 **Budget.** ≈ $1.0 (keep-alive pings ≈ $0.002 each); cap $2. Cumulative before: $1.94.
+
+### Iteration 4 results (`runs/explore/iter04/`: `summary.md`, `figure.png`)
+Spend $0.84 across the phases (ledger rows tagged `lifetime_*`). "Hit" means the reported
+cached_tokens cover ≥ 50% of the prompt. GLM never reports, so for GLM a hit means probe latency
+< 30% of its sequential cold prefill.
+
+**(a) Capacity sweep: hit rate after 30 s idle vs concurrent distinct 15k-token contexts.**
+
+| model | 1 | 4 | 8 | 16 |
+|:--|:--|:--|:--|:--|
+| gpt-oss-20b | 1/1 | 4/4 | 8/8 | 16/16 (probe 0.16 s) |
+| **DeepSeek-V4-Flash** | **3/3** (0.43 s) | **0/4** (4.3 s) | **0/8** (3.6 s) | **0/16** (17 s, 429 "server overloaded") |
+
+DeepSeek's cold prefills also **serialize**: the k-th concurrent warm-up finishes at about 3·k s.
+Its deployment behaves like one small replica that keeps roughly one 15k-token agent context warm.
+
+**(b) Keep-alive under 16 contexts, 60 s gap: 0/8 hits with pings every 4 s, 0/8 silent.** Each
+ping waited ~20 s in the overloaded queue, so only 2 pings per context got through. Keep-alive cannot
+rescue a deployment whose cache is too small for the working set. It adds load and full-price
+tokens.
+
+**(c) Map at 12 contexts per model (5/30/120/600 s gaps):** MiniMax-M2.5, Qwen3.5-397B and
+Qwen3.8-27B hit 100% at every gap, out to 10 min. gemma-4-31B starts to drop: 3/3, 2/3, 2/3, 1/3.
+Its warm-ups queue for 8–10 s (a small deployment).
+**(d) GLM sequential:** hits at 5 s and 30 s (1.0 s vs 9 s cold), still unreported in `usage`.
+**(e) Re-warm control:** gpt-oss-20b at 10 min with the HTTP connection re-warmed has probe 0.18 s,
+the same as at 0 s. The iteration-3 uptick (0.57 s) was connection re-establishment, not the cache.
+
+**Verdict: keep. The intuitive one-figure finding is capacity under concurrency, not idle lifetime.**
+On a shared serverless deployment, a prefix survives idleness for as long as nothing else evicts it.
+How many agents can stay warm at once is the per-deployment number that matters, and on this
+catalog it ranges from ~1 (DeepSeek-V4-Flash) to ≥ 16 (gpt-oss-20b).
+- This explains iteration 2's DeepSeek append arm (84% cached): back-to-back moves re-used the
+  prefix within ~3 s, before eviction.
+- It also explains iteration 3's "< 30 s" cliff: 15 concurrent contexts.
+
+Rubric: (1) 0/28 hits vs 3/3 at N=1 on DeepSeek, 29/29 on gpt-oss-20b; (2) one figure; (3) cache
+capacity and prefill queueing; (4) ≈ $0.15 per sweep. Scaling it further (a load sweep on every
+model) is cheap, but the mechanism is already clear. The open question it raises is what one agent
+should do when it needs many calls on the same long context. That is iteration 5.
+
+---
+
+## Iteration 5: fan-out over a shared long prefix (LLM reranker pattern)
+
+**Hypothesis.** An agent that asks K parallel questions about the same ~15k-token context (rating K
+beam candidates, best-of-K) races itself. If all K are sent at once while the prefix is cold, each
+request prefills the full prefix (K× prefill tokens and K× billed tokens on uncached-price
+models). Priming (send one, wait, then fan out K−1) makes the rest cache hits. On DeepSeek, cold
+fan-out also serializes, so priming should cut makespan as well. On a fast, large-cache deployment
+(gpt-oss-20b) the cold race may cost little latency but still bills K× uncached tokens.
+
+**Why it matters.** Fan-out is the standard pattern for LLM search, reranking and self-consistency.
+Whether the server deduplicates in-flight identical prefixes, or the client has to prime, is a
+serving property and a cheap client-side fix.
+
+**Config.** `configs/explore/iter05.yaml`. Same 24-turn Tetris prefix with a fresh nonce per trial.
+K ∈ {4, 8}. Strategies: cold_fanout / primed_fanout / sequential. 3 trials. gpt-oss-20b,
+gpt-oss-120b, DeepSeek-V4-Flash. One trial at a time per model, models side by side. max_tokens=1.
+
+**Budget.** ≈ $0.6 (DeepSeek bills every token: ~$0.002 per request). Cap $2. Cumulative before:
+$2.77.
