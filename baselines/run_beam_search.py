@@ -44,10 +44,11 @@ def _record_frame(env, frames, info, max_frames: int) -> None:
         frames.append(frame)
 
 
-def _run_episode(env, planner, max_steps: int, record_frames: bool, video_max_steps: int):
-    obs = env.reset()
+def _run_episode(env, planner, max_steps: int, record_frames: bool, video_max_steps: int, episode_seed: int | None = None):
+    obs = env.reset(seed=episode_seed)
     done = False
     steps = 0
+    lines_cleared = 0
     ep_decision_ms = []
     invalid_count = 0
     decision_count = 0
@@ -71,12 +72,14 @@ def _run_episode(env, planner, max_steps: int, record_frames: bool, video_max_st
             aid = valid[0]
         obs, _, done, info = env.step(aid)
         steps += 1
+        lines_cleared += int(info.get("lines_cleared", 0))
         if record_frames:
             _record_frame(env, frames, info=info, max_frames=video_max_steps)
 
     return {
         "score": float(env.game.score),
         "steps": int(steps),
+        "lines_cleared": int(lines_cleared),
         "decision_ms": ep_decision_ms,
         "invalid_count": int(invalid_count),
         "decision_count": int(decision_count),
@@ -98,7 +101,7 @@ def run_eval(args: argparse.Namespace) -> dict:
         render_mode="skip",
         seed=int(args.seed),
     )
-    planner = BeamSearchPlanner(BeamCfg(horizon=int(args.horizon), beam_width=int(args.beam_width)))
+    planner = BeamSearchPlanner(BeamCfg(horizon=int(args.horizon), beam_width=int(args.beam_width)), sim_seed=int(args.seed))
     logger = MetricsLogger(run_name=str(args.run_name))
     eval_start = time.perf_counter()
     record_video = _as_bool(args.record_video)
@@ -120,6 +123,7 @@ def run_eval(args: argparse.Namespace) -> dict:
             max_steps=int(args.max_steps),
             record_frames=rec_now,
             video_max_steps=int(args.video_max_steps),
+            episode_seed=int(args.seed) + ep,
         )
         ep_scores.append(float(ep_result["score"]))
 
@@ -130,6 +134,8 @@ def run_eval(args: argparse.Namespace) -> dict:
             decision_ms=ep_result["decision_ms"],
             invalid_count=int(ep_result["invalid_count"]),
             decision_count=int(ep_result["decision_count"]),
+            extra={"lines_cleared": float(ep_result["lines_cleared"]), "pieces_placed": float(ep_result["steps"]),
+                   "episode_seed": float(int(args.seed) + ep)},
         )
         if rec_now and ep_result["frames"]:
             out_file = os.path.join(videos_dir, f"{args.run_name}_ep{ep+1:04d}.{args.video_format}")
@@ -152,7 +158,7 @@ def run_eval(args: argparse.Namespace) -> dict:
                 render_mode="skip",
                 seed=int(args.seed),
             )
-            replay_planner = BeamSearchPlanner(BeamCfg(horizon=int(args.horizon), beam_width=int(args.beam_width)))
+            replay_planner = BeamSearchPlanner(BeamCfg(horizon=int(args.horizon), beam_width=int(args.beam_width)), sim_seed=int(args.seed))
             max_target = max(replay_set)
             for ep in range(max_target + 1):
                 rec_now = ep in replay_set
@@ -162,6 +168,7 @@ def run_eval(args: argparse.Namespace) -> dict:
                     max_steps=int(args.max_steps),
                     record_frames=rec_now,
                     video_max_steps=int(args.video_max_steps),
+                    episode_seed=int(args.seed) + ep,
                 )
                 if rec_now and ep_result["frames"]:
                     out_file = os.path.join(videos_dir, f"{args.run_name}_{args.video_select}_ep{ep+1:04d}.{args.video_format}")

@@ -5,7 +5,7 @@ Diffusion-style MPC planner for Tetris.
 
 from __future__ import annotations
 
-import copy
+import random
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -76,11 +76,14 @@ class DiffusionMPCPlanner:
         cfg: PlannerCfg,
         device: torch.device,
         critic: Optional[DQNCritic] = None,
+        sim_seed: int = 0,
     ):
         self.model = model
         self.cfg = cfg
         self.device = device
         self.critic = critic
+        # Seeds for simulation clones; independent of the env's piece stream.
+        self.sim_rng = random.Random(sim_seed)
         self.last_plan_stats = {
             "masked_fraction": 0.0,
             "selected_candidate_invalid_count": 0,
@@ -116,7 +119,7 @@ class DiffusionMPCPlanner:
         return None
 
     def _score_candidate(self, env, seq: List[Tuple[int, int]]) -> Tuple[float, float, List[Tuple[int, int]], int, int]:
-        sim_env = copy.deepcopy(env)
+        sim_env = env.clone_for_simulation(self.sim_rng.getrandbits(32))
         rollout: List[Tuple[int, int]] = []
         invalid_count = 0
 
@@ -155,7 +158,7 @@ class DiffusionMPCPlanner:
 
     def _sample_one_mask_logits(self, env) -> Tuple[List[Tuple[int, int]], float]:
         """Sample one candidate with logits masked over flattened (rot,x) tokens."""
-        sim_env = copy.deepcopy(env)
+        sim_env = env.clone_for_simulation(self.sim_rng.getrandbits(32))
         H = int(self.cfg.horizon)
         W = int(sim_env.game.width)
 

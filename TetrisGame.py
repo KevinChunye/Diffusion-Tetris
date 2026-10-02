@@ -71,10 +71,18 @@ class TetrisGame:
         ]
     }
 
-    def __init__(self, width=10, height=20):
+    def __init__(self, width=10, height=20, seed=None):
         self.width = width
         self.height = height
+        # Each game owns its piece RNG, so an agent's lookahead can never consume (or see) the real
+        # piece stream. An unseeded game takes its seed from the global `random` module, which keeps
+        # older code that only calls random.seed(...) reproducible.
+        self.rng = random.Random(seed if seed is not None else random.getrandbits(64))
         self.reset_board()
+
+    def seed(self, seed):
+        """Reseed the piece generator; call before reset_board() to fix an episode's pieces."""
+        self.rng = random.Random(seed)
 
     def reset_board(self):
         """Prepares the board and spawn the first two tetrominoes"""
@@ -92,7 +100,7 @@ class TetrisGame:
 
     def _random_tetromino(self):
         """Randomly return a piece type and all corresponding rotations"""
-        piece_type = random.choice(self.TETROMINOES_TYPES)
+        piece_type = self.rng.choice(self.TETROMINOES_TYPES)
         rotations = self.TETROMINOES[piece_type]
         return piece_type, rotations
 

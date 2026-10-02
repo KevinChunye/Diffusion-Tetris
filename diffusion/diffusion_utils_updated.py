@@ -43,8 +43,10 @@ class SimResult:
     infos: List[Dict]
 
 
-def clone_env(env):
-    """Deep-copy env (and its game) so we can simulate plans safely."""
+def clone_env(env, sim_seed: Optional[int] = None):
+    """Copy env for simulation; future pieces come from an independent RNG (see clone_for_simulation)."""
+    if hasattr(env, "clone_for_simulation"):
+        return env.clone_for_simulation(sim_seed)
     return copy.deepcopy(env)
 
 
@@ -135,7 +137,7 @@ def valid_placement_mask(board: np.ndarray, curr_piece_id: int) -> np.ndarray:
     if piece is None:
         raise ValueError(f"Unknown curr_piece_id={curr_piece_id}")
 
-    game = TetrisGame(width=w, height=h)
+    game = TetrisGame(width=w, height=h, seed=0)  # scratch board; must not consume the global RNG
     game.board = board.astype(int).copy()
     rotations = TetrisGame.TETROMINOES[piece]
 

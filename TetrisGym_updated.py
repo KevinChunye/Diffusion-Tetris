@@ -1,6 +1,8 @@
 
 from __future__ import annotations
 
+import copy
+import random
 from collections import namedtuple
 
 import numpy as np
@@ -29,7 +31,7 @@ class TetrisGym:
     """
 
     def __init__(self, width=10, height=20, max_steps=None, render_mode='skip', seed=None):
-        self.game = TetrisGame(width, height)
+        self.game = TetrisGame(width, height, seed=seed)
         self.max_steps = max_steps
         self.render_mode = render_mode
         self.step_count = 0
@@ -70,7 +72,11 @@ class TetrisGym:
         next_id, _ = self.game.next_piece
         return Observation(board, PIECE2IDX[curr_id], PIECE2IDX[next_id])
 
-    def reset(self) -> Observation:
+    def reset(self, seed=None) -> Observation:
+        """Start a new episode. With `seed`, the episode's piece sequence depends only on that seed
+        (use episode_seed = base_seed + episode_idx), whatever the agent simulates."""
+        if seed is not None:
+            self.game.seed(seed)
         self.game.reset_board()
         # `reset_board()` seeds `next_piece` but leaves `current_piece=None`.
         # Push the queue forward so `current_piece` is populated.
@@ -111,6 +117,28 @@ class TetrisGym:
 
         # reward intentionally 0.0; agents compute shaped reward from `info`
         return obs, 0.0, done, info
+
+    def clone_for_simulation(self, sim_seed=None) -> "TetrisGym":
+        """Copy of this env for lookahead that cannot see the real future.
+
+        The visible state (board, current piece, next-piece preview, score) is copied exactly. Every
+        piece after the preview comes from an independent `random.Random(sim_seed)`, so rollouts
+        neither read nor advance the real piece stream, and the clone has no step limit. Use this for
+        all planning/simulation.
+        """
+        # Explicit copy (~20x faster than deepcopy): the action maps and piece rotation arrays are
+        # read-only and shared; the board is the only state mutated in place.
+        sim = copy.copy(self)
+        sim.game = copy.copy(self.game)
+        sim.game.board = self.game.board.copy()
+        sim.game.rng = random.Random(sim_seed)
+        sim.valid_actions = list(self.valid_actions)
+        sim.frames = []
+        sim.render_mode = 'skip'
+        # The real episode's step budget must not truncate lookahead: a truncated sim reports done
+        # without game over and keeps a stale action list, which made beam search step illegal moves.
+        sim.max_steps = None
+        return sim
 
     def get_valid_action_ids(self) -> list[int]:
         """Return discrete action ids corresponding to valid actions."""

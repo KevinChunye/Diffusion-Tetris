@@ -5,7 +5,7 @@ Non-neural beam-search planner for Tetris placement actions.
 
 from __future__ import annotations
 
-import copy
+import random
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -26,15 +26,20 @@ class BeamNode:
 
 
 class BeamSearchPlanner:
-    def __init__(self, cfg: BeamCfg):
+    def __init__(self, cfg: BeamCfg, sim_seed: int = 0):
         self.cfg = cfg
+        # Seeds for simulation clones; independent of the env's piece stream.
+        self.sim_rng = random.Random(sim_seed)
+
+    def _clone(self, env):
+        return env.clone_for_simulation(self.sim_rng.getrandbits(32))
 
     def plan(self, env) -> Tuple[int, float]:
         valid_root = env.get_valid_action_ids()
         if not valid_root:
             return 0, -1e18
 
-        beam: List[BeamNode] = [BeamNode(env=copy.deepcopy(env), first_action_id=valid_root[0], score=-1e18)]
+        beam: List[BeamNode] = [BeamNode(env=self._clone(env), first_action_id=valid_root[0], score=-1e18)]
 
         for depth in range(max(1, self.cfg.horizon)):
             expanded: List[BeamNode] = []
@@ -45,7 +50,7 @@ class BeamSearchPlanner:
                 if not valid_ids:
                     continue
                 for aid in valid_ids:
-                    sim = copy.deepcopy(node.env)
+                    sim = self._clone(node.env)
                     if bool(sim.game.game_over):
                         continue
                     try:

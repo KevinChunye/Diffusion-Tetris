@@ -71,10 +71,18 @@ class TetrisGame:
         ]
     }
 
-    def __init__(self, width=10, height=20):
+    def __init__(self, width=10, height=20, seed=None):
         self.width = width
         self.height = height
+        # Each game owns its piece RNG, so an agent's lookahead can never consume (or see) the real
+        # piece stream. An unseeded game takes its seed from the global `random` module, which keeps
+        # older code that only calls random.seed(...) reproducible.
+        self.rng = random.Random(seed if seed is not None else random.getrandbits(64))
         self.reset_board()
+
+    def seed(self, seed):
+        """Reseed the piece generator; call before reset_board() to fix an episode's pieces."""
+        self.rng = random.Random(seed)
 
     def reset_board(self):
         """Prepares the board and spawn the first two tetrominoes"""
@@ -92,19 +100,56 @@ class TetrisGame:
 
     def _random_tetromino(self):
         """Randomly return a piece type and all corresponding rotations"""
-        piece_type = random.choice(self.TETROMINOES_TYPES)
+        piece_type = self.rng.choice(self.TETROMINOES_TYPES)
         rotations = self.TETROMINOES[piece_type]
         return piece_type, rotations
 
-    def _find_drop_height(self, piece, x):
-        h, _ = piece.shape
-        last_valid_y = None
-        for y in range(self.height - h + 1):
-            if not self._valid_position(piece, (y, x)):  # Find the lowest valid position
-                break
-            last_valid_y = y
-        return last_valid_y
-    
+    _PROFILE_CACHE = {}
+
+    @classmethod
+    def _piece_profile(cls, piece):
+        """(top row, bottom row) occupied in each piece column, cached by shape + contents (not id(),
+        which deep copies recycle)."""
+        key = (piece.shape, piece.tobytes())
+        prof = cls._PROFILE_CACHE.get(key)
+        if prof is None:
+            h, w = piece.shape
+            prof = ([min(r for r in range(h) if piece[r, c]) for c in range(w)],
+                    [max(r for r in range(h) if piece[r, c]) for c in range(w)])
+            cls._PROFILE_CACHE[key] = prof
+        return prof
+
+    def _column_tops(self):
+        """Row index of the topmost filled cell per column (self.height if the column is empty)."""
+        filled = self.board != 0
+        first = filled.argmax(axis=0).tolist()
+        any_filled = filled.any(axis=0).tolist()
+        return [f if a else self.height for f, a in zip(first, any_filled)]
+
+    def _find_drop_height(self, piece, x, tops=None):
+        """Last valid y when moving `piece` down from y=0 at column x (None if y=0 already collides).
+
+        Same result as the original scan (y = 0, 1, ... until the first collision), computed in
+        O(width) from column tops. Piece columns are contiguous, so column c first collides when its
+        bottom cell reaches the first filled board cell at/below the row where that column starts."""
+        _, w = piece.shape
+        if x < 0 or x + w > self.width:
+            return None
+        if tops is None:
+            tops = self._column_tops()
+        p_tops, p_bottoms = self._piece_profile(piece)
+        y_hit = self.height
+        for c in range(w):
+            first = tops[x + c]
+            if first < p_tops[c]:
+                # Near the top a block can sit above where this piece column starts at y=0; the scan
+                # never checks above y=0, so only blocks at/below row p_tops[c] matter.
+                below = np.flatnonzero(self.board[p_tops[c]:, x + c])
+                first = p_tops[c] + int(below[0]) if below.size else self.height
+            y_hit = min(y_hit, first - p_bottoms[c])
+        y = y_hit - 1
+        return y if y >= 0 else None
+
     def _valid_position(self, piece, position):
         """Check if the piece at the given position is within bounds and does not collide."""
         y, x = position
@@ -120,6 +165,7 @@ class TetrisGame:
         """Return a list of all valid (rotation_index, x_position) tuples"""
         piece_type, rotations = self.current_piece
         valid_actions = []
+        tops = self._column_tops()
 
         # Fixed rotation index in {0,1,2,3}. Pieces with fewer unique rotations
         # simply have fewer valid actions.
@@ -130,8 +176,8 @@ class TetrisGame:
             _, piece_width = piece.shape
             # Try placing the piece at every horizontal position where it fits
             for x in range(self.width - piece_width + 1):
-                y = self._find_drop_height(piece, x)
-                if y is not None and self._valid_position(piece, (y, x)):
+                y = self._find_drop_height(piece, x, tops)
+                if y is not None:
                     valid_actions.append((rot_idx, x))
 
         return valid_actions
