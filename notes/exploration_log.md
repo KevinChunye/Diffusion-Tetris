@@ -93,3 +93,112 @@ DeepSeek runs without reasoning (`max_tokens=64`); gpt-oss uses `reasoning_effor
 
 **Budget.** Projected from iteration-1 token profiles: ≤ $2.8 worst case (if every episode lasts
 100 pieces; DeepSeek-append alone ≈ $0.45/episode). Cap $5. Cumulative before this iteration: $0.13.
+
+### Iteration 2 results (`runs/explore/iter02/`)
+Spend $0.87 (1999 calls, 0 retries). $ per 100 decisions and cached share:
+
+| model (cached price) | stateless | append | window8 |
+|:--|--:|--:|--:|
+| gpt-oss-20b ($0) | 0.0065 · 47% | 0.0065 · 95% | **0.0325** · 21% |
+| gpt-oss-120b ($0) | 0.0144 · 46% | 0.0153 · 96% | **0.0839** · 13% |
+| DeepSeek-V4-Flash (none listed) | 0.0153 · 24% | **0.1596** · 84% | 0.0765 · 14% |
+
+Pieces survived per seed (1000–1003):
+
+| model | stateless | append | window8 |
+|:--|:--|:--|:--|
+| gpt-oss-20b | 100/76/56/81 | 32/38/23/32 | 42/28/43/44 |
+| gpt-oss-120b | 100/55/100/100 | 53/51/39/43 | 96/81/100/100 |
+| DeepSeek-V4-Flash | 51/35/35/31 | 41/33/32/32 | 45/44/32/75 |
+
+**Verdict: the cost result scales, and the price card flips the ranking.**
+- On both $0-cached models the iteration-1 ordering holds: append costs the same as stateless and
+  window8 costs 5.0–5.8× more.
+- On DeepSeek-V4-Flash, append is the **most expensive** policy, 10.4× stateless and 2.1× window8.
+  84% of its prompt is a reported cache hit, but every token is still billed. The cache works, and
+  the price card throws the saving away.
+- Quality (piece counts here; regret is added when the oracle finishes):
+  - Long append history hurts both gpt-oss sizes in 4/4 seeds.
+  - The 8-turn window is nearly harmless for gpt-oss-120b but not for gpt-oss-20b.
+  - DeepSeek-V4-Flash with no reasoning plays poorly in every arm.
+- TTFT: DeepSeek-V4-Flash sits at a 2.2–2.4 s median in every arm under this load (p90 ≈ 5 s), so
+  queueing swamps prefill. On gpt-oss-120b, window8 adds +0.23 s median TTFT over stateless.
+
+The thread is now scaled across seeds, models and price cards. Next, branch to a new serving
+question.
+
+---
+
+## Iteration 3: KV-cache lifetime under idle gaps
+
+**Hypothesis.** A cached prefix survives short idle gaps (seconds) but is evicted after minutes on a
+shared serverless deployment. Once it is evicted, the next turn pays the full cold prefill again. On
+deployments that report the split, LMCache (CPU/remote tier) should keep the prefix longer than the
+vLLM GPU prefix cache. The gap where the benefit disappears should differ by model with traffic and
+memory pressure.
+
+**Why it matters.** Real agents idle between moves: tool calls, slow environments, humans in the
+loop. If the cache dies after ~a minute, a 16k-token agent context costs a full prefill (seconds on
+large models, and dollars on no-cached-price models) after every pause. That would favour keep-alive
+pings or shorter contexts. It is the serverless analogue of a CPU cache's working-set lifetime.
+
+**Config.** `configs/explore/iter03.yaml`. Prefix: a real 24-turn append-history Tetris prompt from
+a greedy-bot game (~16k tokens), with a unique nonce first so the warm-up starts cold. Gaps 0 s, 5 s,
+30 s, 2 min, 10 min. 3 trials per gap (the analogue of 3 paired seeds). Models: gpt-oss-20b,
+gpt-oss-120b, Kimi-K2.7-Code, DeepSeek-V4-Flash, GLM-5.2-NVFP4. Non-streaming calls with
+max_tokens=1, so latency ≈ prefill and the tier split is visible.
+
+**Budget.** ≈ $1 (GLM cold+warm 16k calls dominate at $1.40/M). Cap $2. Cumulative before: $1.00.
+
+### Iteration 3 results (`runs/explore/iter03/`: `summary.md`, `figure.png`)
+Spend $0.93 (150 calls). Prompt: 14.8–15.0k tokens. Values are medians of 3 trials, latency of the
+next turn with max_tokens=1.
+
+| model | cold | 0 s | 5 s | 30 s | 2 min | 10 min | cached share after gap |
+|:--|--:|--:|--:|--:|--:|--:|:--|
+| gpt-oss-20b | 1.00 s | 0.16 | 0.18 | 0.25 | 0.19 | 0.57 | 94% at every gap |
+| gpt-oss-120b | 1.29 s | 0.21 | 0.21 | 0.24 | 0.21 | 0.70 | 94% (vLLM 14112, LMCache 13824) |
+| Kimi-K2.7-Code | 3.34 s | 0.39 | 0.38 | 0.52 | 0.39 | 0.86 | 94% (vLLM 14048, LMCache 13824) |
+| **DeepSeek-V4-Flash** | 3.5 s | 0.36 | 0.36 | **3.48** | **3.59** | **3.92** | **93% → 0% between 5 s and 30 s** |
+| GLM-5.2-NVFP4 | 34–44 s | 29 | 26 | 30 | 1.0 | 1.5 | never reported |
+
+**Verdict: keep and go deeper. This is the most serverless-specific effect so far.**
+- **DeepSeek-V4-Flash forgets a 15k-token agent context in under 30 s of idleness.** After that,
+  the next move costs a full cold prefill: 10× the warm latency, and because no cached price is
+  listed the bill is the same either way. gpt-oss-20b/120b and Kimi keep the same prefix for ≥ 10 min.
+  On the models that report the split, the vLLM GPU tier still holds it at 10 min.
+- The 10-min latency uptick on the ≥10-min models (0.2 → 0.6–0.9 s) happens with 94% cache hits, so
+  it is not a miss. It is probably the client re-opening an idle keep-alive connection. Iteration 4
+  controls for this.
+- GLM's short-gap numbers are confounded by queueing we caused ourselves: 15 concurrent 15k-token
+  GLM prefills, with cold calls at 34–44 s. Its 2-min and 10-min probes (1.0–1.5 s vs ≥ 34 s cold)
+  imply hits that `usage` never reports.
+
+Rubric: (1) DeepSeek's cliff is 10× with 3/3 trials on each side of it; (2) one sentence, one figure;
+(3) cache lifetime is a core serving property; (4) about $0.03 per (model, gap) point. → deepen it.
+
+---
+
+## Iteration 4: map cache lifetime across the catalog + keep-alive mitigation
+
+**Hypotheses.**
+(a) DeepSeek-V4-Flash's lifetime is a sharp cliff somewhere in 5–30 s (idle-time eviction rather
+than gradual LRU churn).
+(b) Keep-alive pings faster than the lifetime keep the prefix warm. On a no-cached-price model each
+ping is billed at full price, so keep-alive buys latency with money.
+(c) The other four catalog models each have their own lifetime, so "how long can my agent think
+between moves" depends on the deployment.
+(d) GLM, measured without self-induced queueing, hits at short gaps too.
+(e) The 10-min latency uptick disappears when the HTTP connection is re-warmed before the probe.
+
+**Why it matters.** An agent framework could choose its keep-alive cadence, or pick a model, based
+on a measured lifetime. A platform could expose the lifetime, or offer a cheap keep-alive, the way
+CDNs expose TTLs.
+
+**Config.** `configs/explore/iter04.yaml`. Same 24-turn Tetris prefix and method as iteration 3, plus
+a connection re-warm (GET /v1/models) right before every probe. DeepSeek gaps 8/12/16/20/25 s.
+DeepSeek 60 s gaps with keep-alive every 4 s and every 15 s. gemma-4, MiniMax-M2.5, Qwen3.8,
+Qwen3.5 at gaps 5/30/120/600 s. GLM at 5 and 30 s run sequentially. 3 trials each (GLM 2).
+
+**Budget.** ≈ $1.0 (keep-alive pings ≈ $0.002 each on DeepSeek; Qwen3.5 is the dearest model).
+Cap $2. Cumulative before: $1.93.

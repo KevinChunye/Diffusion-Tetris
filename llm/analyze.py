@@ -191,6 +191,58 @@ def plot_models(steps: pd.DataFrame, order: List[str], title: str, out_png: str)
     plt.close(fig)
 
 
+def lifetime_summary(d: str) -> pd.DataFrame:
+    lt = pd.read_csv(os.path.join(d, "lifetime.csv"))
+    lt = lt[lt["ok"]].copy()
+    lt["cached_frac"] = lt["cached_probe"] / lt["prompt_probe"]
+    lt["speedup"] = lt["latency_warm"] / lt["latency_probe"]
+    g = lt.groupby(["model", "gap_s"]).agg(
+        trials=("trial", "size"), prompt=("prompt_probe", "median"), cached_frac=("cached_frac", "median"),
+        vllm_cached=("vllm_cached_probe", "median"), lmcache_cached=("lmcache_cached_probe", "median"),
+        cold_latency=("latency_warm", "median"), probe_latency=("latency_probe", "median"),
+        speedup=("speedup", "median"), actual_gap=("actual_gap_s", "median"), cost=("cost_usd", "sum")).reset_index()
+    return g.sort_values(["model", "gap_s"])
+
+
+def plot_lifetime(g: pd.DataFrame, title: str, out_png: str) -> None:
+    """Two panels vs idle gap (log x): prefill latency of the next turn, and share of it served from cache."""
+    plotstyle.setup()
+    import matplotlib.pyplot as plt
+
+    models = list(dict.fromkeys(g["model"]))
+    colors = plotstyle.colors_for(models)
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.6), constrained_layout=True)
+    hidden = []
+    for m in models:
+        d = g[g["model"] == m].sort_values("gap_s")
+        x = d["gap_s"].clip(lower=1)  # 0 s gap drawn at 1 s on the log axis
+        label = m.split("/")[-1]
+        axes[0].plot(x, d["probe_latency"], color=colors[m], marker="o", markersize=5, label=label)
+        axes[0].scatter([0.6], [d["cold_latency"].median()], color=colors[m], marker="x", s=36)
+        if d["cached_frac"].max() <= 0 and d["probe_latency"].min() < 0.2 * d["cold_latency"].median():
+            hidden.append(label)  # fast warm turns but 0 cached tokens reported: hits are not reported
+            continue
+        axes[1].plot(x, d["cached_frac"], color=colors[m], marker="o", markersize=5, label=label)
+    for ax in axes:
+        ax.set_xscale("log")
+        ax.set_xticks([0.6, 1, 5, 30, 120, 600])
+        ax.set_xticklabels(["cold", "0 s", "5 s", "30 s", "2 min", "10 min"])
+        ax.set_xlabel("idle gap before the next turn")
+    axes[0].set_title("Latency of the next turn (max_tokens=1 ≈ prefill); x = cold", loc="left")
+    axes[0].set_ylabel("seconds (log scale, median of trials)")
+    axes[0].set_yscale("log")
+    if hidden:
+        axes[1].text(0.02, 0.04, f"not shown (reports 0 cached tokens even on hits): {', '.join(hidden)}",
+                     transform=axes[1].transAxes, fontsize=8, color=plotstyle.INK_2)
+    axes[1].set_title("Share of the next turn's prompt served from cache", loc="left")
+    axes[1].set_ylabel("cached / prompt tokens")
+    axes[1].set_ylim(-0.02, 1.02)
+    axes[0].legend(loc="upper right")
+    fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
+    fig.savefig(out_png, dpi=150)
+    plt.close(fig)
+
+
 def write_tables(d: str, summary: pd.DataFrame, pairs: pd.DataFrame) -> str:
     md = "### Per-arm summary\n\n" + summary.round(4).to_markdown(index=False)
     if not pairs.empty:
@@ -208,6 +260,19 @@ def main() -> None:
     ap.add_argument("--kind", default="history")
     ap.add_argument("--baseline", default="")
     args = ap.parse_args()
+    if args.kind == "lifetime":
+        with open(os.path.join(args.dir, "config.yaml"), "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        g = lifetime_summary(args.dir)
+        md = "### KV-cache lifetime (medians over trials)\n\n" + g.round(3).to_markdown(index=False)
+        g.to_csv(os.path.join(args.dir, "summary.csv"), index=False)
+        with open(os.path.join(args.dir, "summary.md"), "w", encoding="utf-8") as f:
+            f.write(md + "\n")
+        print(md)
+        plot_lifetime(g, f"Iteration {cfg['iteration']}: KV-cache lifetime under idle gaps "
+                         f"(~{int(g['prompt'].median()):,}-token Tetris history, {int(g['trials'].max())} trials)",
+                      os.path.join(args.dir, "figure.png"))
+        return
     steps, eps, cfg = load(args.dir)
     order = arm_order(cfg)
     summary = arm_summary(steps, eps, order)

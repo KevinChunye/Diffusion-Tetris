@@ -1,3 +1,5 @@
 iteration,label,cost_usd,n_calls,utc
 1,history_policies,0.056502,511,2026-10-02T15:08:06Z
 1,history_policies,0.074477,578,2026-10-02T15:15:54Z
+2,history_x_pricecard,0.868922,1999,2026-10-02T15:33:10Z
+3,cache_lifetime,0.927955,150,2026-10-02T15:46:20Z
