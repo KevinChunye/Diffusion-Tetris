@@ -288,3 +288,50 @@ gpt-oss-120b, DeepSeek-V4-Flash. One trial at a time per model, models side by s
 
 **Budget.** ≈ $0.6 (DeepSeek bills every token: ~$0.002 per request). Cap $2. Cumulative before:
 $2.77.
+
+### Iteration 5 results (`runs/explore/iter05/`: `summary.md`, `figure.png`)
+Spend $0.27 (54 trials). Medians of 3 trials, shared prefix ≈ 14k tokens.
+
+| model | K | prefills computed (cold fan-out) | prefills billed at full price | makespan cold / primed / sequential |
+|:--|--:|--:|--:|:--|
+| gpt-oss-20b | 8 | 1.01 | 1.01 | 0.98 / 1.34 / 1.37 s |
+| gpt-oss-120b | 8 | 1.01 | 1.01 | 1.33 / 1.68 / 1.87 s |
+| DeepSeek-V4-Flash | 8 | 1.07 | **8.0** | 4.09 / 5.23 / 5.05 s |
+
+**Verdict: the hypothesis is refuted, and the result is useful anyway.**
+- The platform dedups **in-flight** identical prefixes. K simultaneous cold requests prefill the
+  shared context once on all three models (18/18 configurations), so there is no race to fix.
+- Cold fan-out is the **fastest** strategy: makespan ≈ one cold prefill. Priming first only adds a
+  round-trip.
+- The only fan-out penalty is the price card. DeepSeek-V4-Flash bills **8×** the prefix for work
+  the server did **once**, while gpt-oss bills ≈ 1×. This is the same theme as iteration 2:
+  "cached but not discounted" turns the platform's efficiency into user cost.
+
+Rubric: (1) deterministic (computed ≈ 1.0 prefill, 18/18); (2) one figure; (3) prefill sharing,
+cost, latency; (4) $0.27. The mechanism is settled, and more K or more models would not change the
+picture. The remaining iteration goes to the capstone the plan asks for: a model ladder on the best
+configuration.
+
+---
+
+## Iteration 6: model ladder (score vs $ vs latency) on the best configuration
+
+**Hypothesis.** Decision quality varies widely across the catalog, and it does not track price.
+Small, cheap models with low reasoning (gpt-oss-20b) can beat much larger direct-answer models.
+Adding reasoning effort (gpt-oss-120b, medium) buys quality with decode-bound latency.
+Cached-price models get a further cost edge, because the ~530-token static prefix is free on them.
+
+**Why it matters.** For agents on serverless open models, the Pareto front of quality vs $ vs
+latency picks the model. Prefix caching and the price card shift it.
+
+**Config.** `configs/explore/iter06.yaml`:
+- Stateless memory, static-first prompt, annotated legal ids.
+- **Constrained output** (`json_schema` enum of legal ids) for every arm, so format failures (7–14%
+  for DeepSeek with free-form JSON in iteration 2) don't count as bad decisions.
+- Direct answers where thinking can be disabled; gpt-oss at `low`; one `gpt-oss-120b/medium` arm.
+- 3 seeds × 100 pieces, all arms concurrent.
+- MiniMax-M2.5 is excluded: it can't disable reasoning, and it exceeded 2048 reasoning tokens
+  (~20 s, no answer) on 3/3 smoke-test moves.
+- Kimi runs with thinking off (`json_schema` stops its reasoning leaking into `content`).
+
+**Budget.** ≈ $1.3 (GLM ≈ $0.46 dominates); cap $4. Cumulative before: $3.07.

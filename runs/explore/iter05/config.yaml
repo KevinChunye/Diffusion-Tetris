@@ -1,0 +1,17 @@
+iteration: 5
+name: fanout_shared_prefix
+models:
+- openai/gpt-oss-20b
+- openai/gpt-oss-120b
+- deepseek-ai/DeepSeek-V4-Flash
+k_values:
+- 4
+- 8
+strategies:
+- cold_fanout
+- primed_fanout
+- sequential
+trials: 3
+history_turns: 24
+pause_s: 3.0
+budget_usd: 2.0

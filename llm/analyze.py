@@ -305,6 +305,65 @@ def plot_capacity(cap: pd.DataFrame, title: str, out_png: str) -> None:
     plt.close(fig)
 
 
+def fanout_summary(d: str) -> pd.DataFrame:
+    import yaml as _yaml
+
+    fo = pd.read_csv(os.path.join(d, "fanout.csv"))
+    pricing = _yaml.safe_load(open("configs/pricing.yaml"))["models"]
+    fo["billed_full_price_tokens"] = [
+        r.prompt_tokens if pricing[r.model]["cached"] is None else r.computed_tokens for r in fo.itertuples()]
+    g = fo.groupby(["model", "k", "strategy"]).agg(
+        trials=("trial", "size"), prefix_tokens=("prompt_per_request", "median"),
+        computed_tokens=("computed_tokens", "median"), billed_full_price_tokens=("billed_full_price_tokens", "median"),
+        makespan_s=("makespan_s", "median"), latency_p50=("latency_p50", "median"), cost_usd=("cost_usd", "median"),
+        retries=("retries", "sum")).reset_index()
+    g["prefills_computed"] = g["computed_tokens"] / g["prefix_tokens"]
+    g["prefills_billed"] = g["billed_full_price_tokens"] / g["prefix_tokens"]
+    return g
+
+
+def plot_fanout(g: pd.DataFrame, title: str, out_png: str) -> None:
+    """Left: prefills computed vs billed at full price (K=8). Right: makespan by strategy (K=8)."""
+    plotstyle.setup()
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    k = int(g["k"].max())
+    d = g[g["k"] == k]
+    models = list(dict.fromkeys(d["model"]))
+    strategies = ["cold_fanout", "primed_fanout", "sequential"]
+    colors = plotstyle.colors_for(strategies)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), constrained_layout=True)
+    x = np.arange(len(models))
+    width = 0.24
+    for i, (col, label) in enumerate([("prefills_computed", "prefills computed by the server"),
+                                      ("prefills_billed", "prefills billed at full input price")]):
+        vals = d[d["strategy"] == "cold_fanout"].set_index("model").loc[models, col]
+        bars = axes[0].bar(x + (i - 0.5) * (width + 0.04), vals, width, color=plotstyle.SERIES[i], label=label)
+        for b, v in zip(bars, vals):
+            axes[0].annotate(f"{v:.1f}", (b.get_x() + b.get_width() / 2, v), xytext=(0, 3), textcoords="offset points",
+                             ha="center", fontsize=8, color=plotstyle.INK_2)
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels([m.split("/")[-1] for m in models])
+    axes[0].set_ylabel(f"multiples of the 15k-token prefix (K={k} requests)")
+    axes[0].set_title(f"Cold fan-out of K={k}: computed once, billed K times?", loc="left")
+    axes[0].legend(loc="upper right")
+    for j, st in enumerate(strategies):
+        vals = d[d["strategy"] == st].set_index("model").loc[models, "makespan_s"]
+        axes[1].bar(x + (j - 1) * (width + 0.03), vals, width, color=colors[st], label=st.replace("_", " "))
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels([m.split("/")[-1] for m in models])
+    axes[1].set_ylabel("seconds until all K answers (median)")
+    axes[1].set_title(f"Makespan by strategy (K={k})", loc="left")
+    axes[1].legend(loc="upper right")
+    for ax in axes:
+        ax.grid(axis="x", visible=False)
+        ax.set_axisbelow(True)
+    fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
+    fig.savefig(out_png, dpi=150)
+    plt.close(fig)
+
+
 def write_tables(d: str, summary: pd.DataFrame, pairs: pd.DataFrame) -> str:
     md = "### Per-arm summary\n\n" + summary.round(4).to_markdown(index=False)
     if not pairs.empty:
@@ -322,6 +381,16 @@ def main() -> None:
     ap.add_argument("--kind", default="history")
     ap.add_argument("--baseline", default="")
     args = ap.parse_args()
+    if args.kind == "fanout":
+        g = fanout_summary(args.dir)
+        md = "### Fan-out over a shared ~14k-token prefix (medians of 3 trials)\n\n" + g.round(3).to_markdown(index=False)
+        g.to_csv(os.path.join(args.dir, "summary.csv"), index=False)
+        with open(os.path.join(args.dir, "summary.md"), "w", encoding="utf-8") as f:
+            f.write(md + "\n")
+        print(md)
+        plot_fanout(g, "Iteration 5: K parallel questions over one long Tetris context (LLM-reranker pattern)",
+                    os.path.join(args.dir, "figure.png"))
+        return
     if args.kind == "capacity":
         lt, cap, other = capacity_tables(args.dir)
         md = ("### Cache hit after 30 s idle vs concurrent contexts\n\n" + cap.round(3).to_markdown(index=False)
