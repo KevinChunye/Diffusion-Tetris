@@ -19,6 +19,15 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def pd_sorted_by_mtime(paths):
+    """Oldest -> newest (the last one is the run that just finished)."""
+    import pandas as pd
+
+    if not paths:
+        return []
+    return pd.DataFrame({"p": paths, "t": [os.path.getmtime(p) for p in paths]}).sort_values("t")["p"].tolist()
+
+
 def run(cmd):
     print("[train]", " ".join(cmd), flush=True)
     subprocess.run(cmd, check=True, cwd=REPO)
@@ -48,8 +57,11 @@ def main() -> None:
         run([py, "train_updated.py", "--episodes", str(args.episodes), "--max_steps", str(args.max_steps),
              "--eval_episodes", str(args.eval_episodes), "--device", args.device, "--seed", str(args.seed),
              "--runs_dir", args.runs_dir])
-        ckpts = sorted(glob.glob(os.path.join(REPO, args.runs_dir, "*", "checkpoint.pt")), key=os.path.getmtime)
-        ckpt = os.path.relpath(ckpts[-1], REPO) if ckpts else "<checkpoint.pt>"
+        ckpts = glob.glob(os.path.join(REPO, args.runs_dir, "*", "checkpoint.pt"))
+        ckpts = list(pd_sorted_by_mtime(ckpts))
+        ckpt = ckpts[-1] if ckpts else "<checkpoint.pt>"
+        if ckpts and os.path.abspath(ckpt).startswith(REPO + os.sep):
+            ckpt = os.path.relpath(ckpt, REPO)
         print(f"\nDeploy it:\n  python -m harness.play --bot dqn:{ckpt} --seeds 0 --pieces 200 --gif runs/play/dqn.gif")
         return
     data_dir = os.path.join(args.out_dir, "dataset")

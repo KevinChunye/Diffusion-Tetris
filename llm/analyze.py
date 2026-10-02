@@ -364,6 +364,52 @@ def plot_fanout(g: pd.DataFrame, title: str, out_png: str) -> None:
     plt.close(fig)
 
 
+def _pareto(points: pd.DataFrame, x: str, y: str) -> pd.DataFrame:
+    """Non-dominated points (lower x, higher y), sorted by x."""
+    pts = points.sort_values([x, y], ascending=[True, False])
+    best = -np.inf
+    keep = []
+    for idx, row in pts.iterrows():
+        if row[y] > best:
+            keep.append(idx)
+            best = row[y]
+    return pts.loc[keep]
+
+
+def plot_ladder(summary: pd.DataFrame, eps: pd.DataFrame, cached_price: dict, title: str, out_png: str) -> None:
+    """Normalized score vs $ / 100 decisions and vs median decision latency; Pareto front dashed."""
+    plotstyle.setup()
+    import matplotlib.pyplot as plt
+
+    spread = eps.groupby("arm")["norm_score"].std().rename("norm_sd")
+    pts = summary.set_index("arm").join(spread).reset_index()
+    pts["arm"] = pts["arm"].astype(str)
+    pts["cached_free"] = pts["arm"].map(cached_price)
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.0), constrained_layout=True)
+    for ax, xcol, xlab in [(axes[0], "usd_per_100_pieces", "USD per 100 decisions (log scale)"),
+                           (axes[1], "latency_p50", "median decision latency, s (log scale)")]:
+        for free, color, marker, label in [(True, plotstyle.SERIES[0], "o", "cached input billed $0"),
+                                           (False, plotstyle.SERIES[1], "s", "no cached price (full input price)")]:
+            d = pts[pts["cached_free"] == free]
+            ax.errorbar(d[xcol], d["norm_score"], yerr=d["norm_sd"], fmt=marker, color=color, ms=8,
+                        mec=plotstyle.SURFACE, mew=1.5, elinewidth=1, capsize=0, label=label)
+        front = _pareto(pts, xcol, "norm_score")
+        ax.plot(front[xcol], front["norm_score"], linestyle=(0, (4, 3)), color=plotstyle.INK_2, linewidth=1, zorder=0)
+        for r in pts.itertuples():
+            ax.annotate(r.arm, (getattr(r, xcol), r.norm_score), xytext=(6, 4), textcoords="offset points",
+                        fontsize=8, color=plotstyle.INK_2)
+        ax.set_xscale("log")
+        ax.set_xlabel(xlab)
+        ax.set_ylabel("normalized score (0 = random, 1 = beam search)")
+        ax.axhline(0, color=plotstyle.GRID, linewidth=1)
+    axes[0].set_title("Quality vs cost (dashed: Pareto front)", loc="left")
+    axes[1].set_title("Quality vs latency", loc="left")
+    axes[0].legend(loc="upper left")
+    fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
+    fig.savefig(out_png, dpi=150)
+    plt.close(fig)
+
+
 def write_tables(d: str, summary: pd.DataFrame, pairs: pd.DataFrame) -> str:
     md = "### Per-arm summary\n\n" + summary.round(4).to_markdown(index=False)
     if not pairs.empty:
@@ -435,6 +481,13 @@ def main() -> None:
     models_used = list(dict.fromkeys(a.split("/")[0] for a in order)) if all("/" in a for a in order) else [cfg.get("model")]
     title = (f"Iteration {cfg.get('iteration')}: {cfg.get('name')} ({', '.join(models_used)}; "
              f"{len(cfg['seeds'])} seeds x {cfg['max_pieces']} pieces)")
+    if args.kind == "ladder":
+        pricing = yaml.safe_load(open("configs/pricing.yaml"))["models"]
+        arm_model = steps.groupby("arm")["model"].first()
+        cached_free = {a: pricing[m]["cached"] is not None for a, m in arm_model.items()}
+        plot_ladder(summary, eps, cached_free, f"Iteration {cfg.get('iteration')}: model ladder, stateless + constrained "
+                    f"output ({len(cfg['seeds'])} seeds x {cfg['max_pieces']} pieces)", os.path.join(args.dir, "figure.png"))
+        return
     if args.kind == "history":
         plot_history(steps, order, title, os.path.join(args.dir, "figure.png"))
     elif args.kind == "models":

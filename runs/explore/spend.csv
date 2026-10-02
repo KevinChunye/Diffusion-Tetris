@@ -12,3 +12,5 @@ iteration,label,cost_usd,n_calls,utc
 4,lifetime_keepalive_load16,0.095559,48,2026-10-02T15:58:14Z
 4,lifetime_map_load12,0.424609,102,2026-10-02T16:02:47Z
 5,fanout_shared_prefix,0.267616,324,2026-10-02T16:06:04Z
+0,phase0_probe,0.400974,251,2026-10-02T14:43:00Z
+0,"smoke_tests (live harness, json_schema checks)",0.033991,47,2026-10-02T16:20:00Z
