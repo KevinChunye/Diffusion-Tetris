@@ -131,6 +131,8 @@ def run(cfg: Dict[str, Any], out_dir: str, mock: bool, workers: int, skip_oracle
 
     steps_df.to_csv(os.path.join(out_dir, "steps.csv"), index=False)
     eps_df.to_csv(os.path.join(out_dir, "episodes.csv"), index=False)
+    for raw in ("steps_raw.csv", "episodes_raw.csv"):  # superseded by the full files
+        os.remove(os.path.join(out_dir, raw))
     return {"cost": cost, "calls": n_calls, "wall_s": wall, "out_dir": out_dir}
 
 

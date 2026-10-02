@@ -15,6 +15,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+from PIL import Image
 
 from harness.render import caption, env_frame, side_by_side, write_gif
 from llm.llm_policy import board_to_str
@@ -49,6 +50,7 @@ def main() -> None:
     ap.add_argument("--fps", type=int, default=4)
     ap.add_argument("--max_frames", type=int, default=150)
     ap.add_argument("--scale", type=float, default=0.6)
+    ap.add_argument("--snapshot", type=int, default=-1, help="also save the side-by-side frame at this piece as PNG")
     args = ap.parse_args()
 
     steps = pd.read_csv(args.steps)
@@ -60,7 +62,12 @@ def main() -> None:
         model = str(ep["model"].iloc[0]).split("/")[-1] if "model" in ep.columns and len(ep) else ""
         columns.append(replay_frames(args.seed, ep, f"{arm} ({model})" if model else arm, args.max_frames))
     out = args.out or os.path.join(os.path.dirname(args.steps), f"replay_seed{args.seed}.gif")
-    print("GIF:", write_gif(side_by_side(columns, scale=args.scale), out, fps=args.fps))
+    frames = side_by_side(columns, scale=args.scale)
+    print("GIF:", write_gif(frames, out, fps=args.fps))
+    if args.snapshot >= 0:
+        png = os.path.splitext(out)[0] + f"_piece{args.snapshot}.png"
+        Image.fromarray(frames[min(args.snapshot, len(frames) - 1)]).save(png)
+        print("PNG:", png)
 
 
 if __name__ == "__main__":

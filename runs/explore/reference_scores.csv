@@ -1,0 +1,7 @@
+policy,episode_seed,max_pieces,score,lines_cleared,pieces_placed,topped_out
+random,1000,100,0.0,0,19,True
+beam,1000,100,85.0,38,100,False
+random,1001,100,0.0,0,25,True
+beam,1001,100,82.0,33,100,False
+random,1002,100,0.0,0,22,True
+beam,1002,100,85.0,39,100,False

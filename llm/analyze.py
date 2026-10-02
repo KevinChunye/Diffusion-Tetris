@@ -142,6 +142,55 @@ def plot_history(steps: pd.DataFrame, order: List[str], title: str, out_png: str
     plt.close(fig)
 
 
+def plot_models(steps: pd.DataFrame, order: List[str], title: str, out_png: str) -> None:
+    """Arms named '<model>/<history>': rows = cached share, $ per decision, TTFT; columns = model;
+    color = history policy (same color for the same policy in every column)."""
+    plotstyle.setup()
+    import matplotlib.pyplot as plt
+
+    steps = steps.copy()
+    steps["model_tag"] = steps["arm"].str.split("/").str[0]
+    steps["history"] = steps["arm"].str.split("/").str[1]
+    steps["cached_frac"] = steps["cached_tokens"] / steps["prompt_tokens"]
+    models = list(dict.fromkeys(a.split("/")[0] for a in order))
+    histories = list(dict.fromkeys(a.split("/")[1] for a in order))
+    colors = plotstyle.colors_for(histories)
+    per_turn = steps.groupby(["model_tag", "history", "turn"]).agg(
+        cached=("cached_frac", "mean"), usd=("cost_usd", "mean"), ttft=("ttft_s", "median"),
+        n=("episode_seed", "size")).reset_index()
+    per_turn = per_turn[per_turn["n"] >= 2]  # at least two seeds still alive at this turn
+    rows = [("cached", "Share of prompt served from cache", "cached / prompt", False),
+            ("usd", "Cost per decision", "USD (log scale)", True),
+            ("ttft", "Time to first token (rolling median)", "seconds", False)]
+    fig, axes = plt.subplots(len(rows), len(models), figsize=(4.2 * len(models), 9.2), sharey="row",
+                             constrained_layout=True, squeeze=False)
+    for j, m in enumerate(models):
+        for i, (col, ttl, ylab, logy) in enumerate(rows):
+            ax = axes[i][j]
+            for h in histories:
+                d = per_turn[(per_turn["model_tag"] == m) & (per_turn["history"] == h)].sort_values("turn")
+                if d.empty:
+                    continue
+                y = d[col]
+                if col == "ttft":
+                    y = y.rolling(7, min_periods=1, center=True).median()
+                ax.plot(d["turn"], y, color=colors[h], label=h)
+            if logy:
+                ax.set_yscale("log")
+            if i == 0:
+                ax.set_title(f"{m}\n{ttl}", loc="left")
+                ax.set_ylim(-0.02, 1.02)
+            else:
+                ax.set_title(ttl, loc="left")
+            ax.set_xlabel("turn (piece index)")
+            if j == 0:
+                ax.set_ylabel(ylab)
+    axes[0][0].legend(loc="lower right")
+    fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
+    fig.savefig(out_png, dpi=150)
+    plt.close(fig)
+
+
 def write_tables(d: str, summary: pd.DataFrame, pairs: pd.DataFrame) -> str:
     md = "### Per-arm summary\n\n" + summary.round(4).to_markdown(index=False)
     if not pairs.empty:
@@ -162,12 +211,23 @@ def main() -> None:
     steps, eps, cfg = load(args.dir)
     order = arm_order(cfg)
     summary = arm_summary(steps, eps, order)
-    metrics = ["norm_score", "lines_cleared", "regret_beam", "regret_rollout", "cost_usd", "ttft_p50", "cached_frac"]
-    pairs = paired(eps, steps, args.baseline or order[0], metrics)
+    metrics = ["norm_score", "lines_cleared", "pieces_placed", "regret_beam", "regret_rollout", "cost_usd",
+               "ttft_p50", "cached_frac"]
+    if all("/" in a for a in order):  # '<model>/<policy>' arms: pair within each model
+        base_policy = args.baseline or order[0].split("/")[1]
+        parts = []
+        for m in dict.fromkeys(a.split("/")[0] for a in order):
+            keep = [a for a in order if a.startswith(m + "/")]
+            parts.append(paired(eps[eps["arm"].isin(keep)], steps[steps["arm"].isin(keep)], f"{m}/{base_policy}", metrics))
+        pairs = pd.concat(parts, ignore_index=True)
+    else:
+        pairs = paired(eps, steps, args.baseline or order[0], metrics)
     print(write_tables(args.dir, summary, pairs))
     title = f"Iteration {cfg.get('iteration')}: {cfg.get('name')} ({cfg.get('model')}, {len(cfg['seeds'])} seeds x {cfg['max_pieces']} pieces)"
     if args.kind == "history":
         plot_history(steps, order, title, os.path.join(args.dir, "figure.png"))
+    elif args.kind == "models":
+        plot_models(steps, order, title, os.path.join(args.dir, "figure.png"))
 
 
 if __name__ == "__main__":
