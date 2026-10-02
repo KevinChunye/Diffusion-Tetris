@@ -335,3 +335,46 @@ latency picks the model. Prefix caching and the price card shift it.
 - Kimi runs with thinking off (`json_schema` stops its reasoning leaking into `content`).
 
 **Budget.** ≈ $1.3 (GLM ≈ $0.46 dominates); cap $4. Cumulative before: $3.07.
+
+### Iteration 6 results (`runs/explore/iter06/`: `summary.md`, `figure.png`, `replay_seed1001_grid.gif`)
+Spend $0.86 for the clean run (1777 calls, 0 retries, 0 failed calls) plus $0.84 for attempt 1.
+Attempt 1 ran at concurrency 16 and drew ~90 HTTP 429 "Too Many Requests" per minute: 7% of moves
+fell back after exhausting retries. It then died on an egress relay reset, which my client wrongly
+treated as fatal (fixed: only a proxy 403/407 now means unreachable). It is archived as
+`attempt1_*` and not analyzed. The rerun used concurrency 6.
+
+Arms are sorted by normalized lines cleared (mean of 3 seeds). Regret is per decision with the same
+oracle; the yardstick is beam 0.12 and greedy 0.21.
+
+| arm | norm. lines | norm. score | regret | top-1 vs beam | $ / 100 decisions | median latency |
+|:--|--:|--:|--:|--:|--:|--:|
+| gpt-oss-120b / medium | **0.85** | 0.76 | 0.49 | 49% | 0.091 | **8.35 s** |
+| gemma-4-31B / direct | 0.66 | **0.88** | **0.38** | 50% | **0.010** | 0.71 s |
+| Kimi-K2.7 / direct | 0.63 | 0.85 | 0.85 | 52% | 0.061 | 0.65 s |
+| gpt-oss-120b / low | 0.57 | 0.51 | 0.59 | 37% | 0.014 | 1.12 s |
+| gpt-oss-20b / low | 0.42 | 0.38 | 0.61 | 39% | **0.0065** | 0.71 s |
+| GLM-5.2 / direct | 0.16 | 0.35 | 2.14 | 34% | **0.150** | 1.14 s |
+| Qwen3.8-27B / direct | 0.10 | 0.13 | 3.11 | 41% | 0.039 | 0.72 s |
+| DeepSeek-V4-Flash / direct | 0.09 | 0.08 | 2.56 | 35% | 0.015 | 0.68 s |
+| Qwen3.5-397B / direct | 0.03 | 0.02 | 3.72 | 46% | 0.070 | 0.66 s |
+
+**Verdict: confirmed. Price and size do not buy decisions.**
+- **Pareto front on cost** (`figure.png`): gpt-oss-20b ($0.0065) → **gemma-4-31B direct**
+  ($0.010) → gpt-oss-120b medium ($0.091).
+- gemma-4 answering directly (≈ 10 output tokens) gets the lowest regret of any arm (0.38) at 1/9
+  the cost and 1/12 the latency of the best reasoning arm.
+- The most expensive model (GLM-5.2, $1.40/M input) is among the worst players, as are Qwen3.5-397B
+  and DeepSeek-V4-Flash.
+- **Reasoning effort is decode-bound.** gpt-oss-120b medium vs low: +0.28 normalized lines and
+  +12.7 pieces (2/3 seeds), regret −0.11 (n.s.), cost ×6.5, median latency 7.4× (8.3 s vs 1.1 s).
+  5.3% of medium moves ran away to the 4096-token cap (36 s, no answer).
+- In this catalog, the three cached-$0 families (gpt-oss, gemma, Kimi) happen to be the strong
+  players and the no-cached-price ones the weak ones. That is a coincidence of the catalog, not an
+  effect of caching. For stateless agents only the 530-token static prefix is cacheable per call,
+  so the price card moves cost by at most ~2×.
+- Serving: under heavier client concurrency the platform rate-limits (attempt 1). With 9 models at
+  once, ≤ 6 concurrent episodes kept the run at 0 retries.
+
+Rubric: (1) gemma's regret and cost advantage over GLM/Qwen/DeepSeek is far beyond seed noise; the
+latency and cost of reasoning are deterministic. (2) One figure. (3) Cost, latency and decode.
+(4) $0.86 per ladder. This was the last iteration. See `notes/exploration_summary.md`.

@@ -377,33 +377,54 @@ def _pareto(points: pd.DataFrame, x: str, y: str) -> pd.DataFrame:
     return pts.loc[keep]
 
 
-def plot_ladder(summary: pd.DataFrame, eps: pd.DataFrame, cached_price: dict, title: str, out_png: str) -> None:
-    """Normalized score vs $ / 100 decisions and vs median decision latency; Pareto front dashed."""
+def _label_points(ax, xs, ys, texts, min_dy: float = 0.05) -> None:
+    """Direct labels right of each point, nudged down in axes space so neighbours don't overlap."""
+    to_axes = ax.transAxes.inverted()
+    pts = pd.DataFrame({"x": xs, "y": ys, "t": texts})
+    disp = ax.transData.transform(pts[["x", "y"]].to_numpy())
+    ax_xy = to_axes.transform(disp)
+    pts["ax"], pts["ay"] = ax_xy[:, 0], ax_xy[:, 1]
+    placed: List[tuple] = []
+    for r in pts.sort_values("ay", ascending=False).itertuples(index=False):
+        ly = r.ay
+        while any(abs(ly - py) < min_dy and abs(r.ax - px) < 0.3 for px, py in placed):
+            ly -= min_dy / 2
+        placed.append((r.ax, ly))
+        ax.annotate(r.t, (r.x, r.y), xytext=(r.ax + 0.015, ly), textcoords="axes fraction", va="center",
+                    fontsize=8, color=plotstyle.INK_2,
+                    arrowprops=dict(arrowstyle="-", color=plotstyle.GRID, lw=0.8) if abs(ly - r.ay) > 0.01 else None)
+
+
+def plot_ladder(summary: pd.DataFrame, eps: pd.DataFrame, cached_price: dict, title: str, out_png: str,
+                y: str = "norm_lines") -> None:
+    """Normalized lines cleared vs $ / 100 decisions and vs median decision latency; Pareto front dashed."""
     plotstyle.setup()
     import matplotlib.pyplot as plt
 
-    spread = eps.groupby("arm")["norm_score"].std().rename("norm_sd")
+    src = "norm_lines_cleared" if y == "norm_lines" else y
+    spread = eps.groupby("arm")[src].std().rename("y_sd")
     pts = summary.set_index("arm").join(spread).reset_index()
     pts["arm"] = pts["arm"].astype(str)
     pts["cached_free"] = pts["arm"].map(cached_price)
-    fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.0), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2), constrained_layout=True)
     for ax, xcol, xlab in [(axes[0], "usd_per_100_pieces", "USD per 100 decisions (log scale)"),
                            (axes[1], "latency_p50", "median decision latency, s (log scale)")]:
         for free, color, marker, label in [(True, plotstyle.SERIES[0], "o", "cached input billed $0"),
                                            (False, plotstyle.SERIES[1], "s", "no cached price (full input price)")]:
             d = pts[pts["cached_free"] == free]
-            ax.errorbar(d[xcol], d["norm_score"], yerr=d["norm_sd"], fmt=marker, color=color, ms=8,
-                        mec=plotstyle.SURFACE, mew=1.5, elinewidth=1, capsize=0, label=label)
-        front = _pareto(pts, xcol, "norm_score")
-        ax.plot(front[xcol], front["norm_score"], linestyle=(0, (4, 3)), color=plotstyle.INK_2, linewidth=1, zorder=0)
-        for r in pts.itertuples():
-            ax.annotate(r.arm, (getattr(r, xcol), r.norm_score), xytext=(6, 4), textcoords="offset points",
-                        fontsize=8, color=plotstyle.INK_2)
+            ax.errorbar(d[xcol], d[y], yerr=d["y_sd"], fmt=marker, color=color, ms=8, mec=plotstyle.SURFACE,
+                        mew=1.5, elinewidth=1, capsize=0, label=label, zorder=3)
+        front = _pareto(pts, xcol, y)
+        ax.plot(front[xcol], front[y], linestyle=(0, (4, 3)), color=plotstyle.INK_2, linewidth=1, zorder=1)
         ax.set_xscale("log")
         ax.set_xlabel(xlab)
-        ax.set_ylabel("normalized score (0 = random, 1 = beam search)")
+        ax.set_ylabel("normalized lines cleared (0 = random, 1 = beam search)")
         ax.axhline(0, color=plotstyle.GRID, linewidth=1)
-    axes[0].set_title("Quality vs cost (dashed: Pareto front)", loc="left")
+        ax.set_ylim(-0.12, 1.12)
+        ax.margins(x=0.25)
+        fig.canvas.draw()
+        _label_points(ax, pts[xcol], pts[y], pts["arm"])
+    axes[0].set_title("Quality vs cost (dashed: Pareto front; bars: ±1 SD over seeds)", loc="left")
     axes[1].set_title("Quality vs latency", loc="left")
     axes[0].legend(loc="upper left")
     fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")

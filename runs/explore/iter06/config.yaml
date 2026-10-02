@@ -1,0 +1,51 @@
+iteration: 6
+name: model_ladder
+model: openai/gpt-oss-20b
+seeds:
+- 1000
+- 1001
+- 1002
+max_pieces: 100
+budget_usd: 4.0
+concurrency: 6
+oracle:
+  n_samples: 2
+  depth: 4
+  beam_h: 2
+  beam_w: 4
+  beam_samples: 1
+defaults:
+  history: stateless
+  annotated: true
+  layout: static_first
+  response_format: json_schema
+  max_tokens: 32
+arms:
+  gpt-oss-20b/low:
+    model: openai/gpt-oss-20b
+    max_tokens: 1024
+  gpt-oss-120b/low:
+    model: openai/gpt-oss-120b
+    max_tokens: 1024
+  gpt-oss-120b/medium:
+    model: openai/gpt-oss-120b
+    max_tokens: 4096
+    chat_kwargs:
+      reasoning_effort: medium
+  gemma-4-31B/direct:
+    model: google/gemma-4-31B-it
+  DeepSeek-V4-Flash/direct:
+    model: deepseek-ai/DeepSeek-V4-Flash
+  Qwen3.8-27B/direct:
+    model: Qwen/Qwen3.8-27B-FP8
+  Qwen3.5-397B/direct:
+    model: Qwen/Qwen3.5-397B-A17B-FP8
+  Kimi-K2.7/direct:
+    model: moonshotai/Kimi-K2.7-Code
+    chat_kwargs:
+      reasoning_effort: null
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+  GLM-5.2/direct:
+    model: lukealonso/GLM-5.2-NVFP4
