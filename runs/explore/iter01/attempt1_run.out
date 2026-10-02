@@ -1,0 +1,43 @@
+[pilot] spent so far $0.000; this run capped at $5.000
+[pilot]        window8 seed 1001: pieces  26 lines   1 score     2  run $0.0340
+[pilot]      compact16 seed 1002: pieces  31 lines   0 score     0  run $0.0397
+[pilot]         append seed 1002: pieces  30 lines   1 score     2  run $0.0411
+[pilot]        window8 seed 1002: pieces  32 lines   1 score     2  run $0.0423
+[pilot]         append seed 1001: pieces  30 lines   2 score     4  run $0.0424
+[pilot]         append seed 1000: pieces  30 lines   1 score     2  run $0.0425
+[pilot]      compact16 seed 1001: pieces  33 lines   2 score     4  run $0.0441
+[pilot]        window8 seed 1000: pieces  35 lines   1 score     2  run $0.0458
+[pilot]      compact16 seed 1000: pieces  28 lines   2 score     4  run $0.0464
+[pilot]      stateless seed 1002: pieces  62 lines  10 score    20  run $0.0539
+[pilot]      stateless seed 1001: pieces  88 lines  22 score    44  run $0.0564
+[pilot]      stateless seed 1000: pieces  86 lines  20 score    41  run $0.0565
+[pilot] 511 calls in 98s, cost $0.0565
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/user/Diffusion-Tetris/llm/run_pilot.py", line 155, in <module>
+    main()
+  File "/home/user/Diffusion-Tetris/llm/run_pilot.py", line 151, in main
+    print(run(cfg, out_dir, mock=args.mock, workers=args.workers, skip_oracle=args.skip_oracle))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/Diffusion-Tetris/llm/run_pilot.py", line 114, in run
+    refs = reference_table(seeds, max_pieces, os.path.join(EXPLORE_DIR, "reference_scores.csv"))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/Diffusion-Tetris/llm/tetris_tools.py", line 128, in reference_table
+    rows.append(run_reference_episode(policy, seed, max_pieces))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/Diffusion-Tetris/llm/tetris_tools.py", line 108, in run_reference_episode
+    _, _, done, info = env.step(act(env))
+                                ^^^^^^^^
+  File "/home/user/Diffusion-Tetris/llm/tetris_tools.py", line 100, in <lambda>
+    act = lambda e: planner.plan(e)[0]
+                    ^^^^^^^^^^^^^^^
+  File "/home/user/Diffusion-Tetris/baselines/beam_search_planner.py", line 57, in plan
+    _, _, done, _ = sim.step(aid)
+                    ^^^^^^^^^^^^^
+  File "/home/user/Diffusion-Tetris/TetrisGym_updated.py", line 94, in step
+    info = self.game.update_board(rot_idx, x)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/Diffusion-Tetris/TetrisGame_updated.py", line 231, in update_board
+    raise ValueError(f"Invalid move attempted: rotation={rot_idx}, x={x}")
+ValueError: Invalid move attempted: rotation=1, x=2

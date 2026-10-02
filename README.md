@@ -44,6 +44,45 @@ python -m experiments.pipeline eval   --config configs/eval_run.yaml   --output_
 
 ---
 
+## Train, deploy and watch a bot
+
+Every bot (random, greedy heuristic, beam search, CNN-DQN, diffusion-MPC, or an open LLM on
+Tensormesh serverless) plays through one interface in `harness/`. GIFs are rendered with the
+env's own renderer. **The same episode seed means the same piece sequence for every bot**, so
+GIFs and metrics compare bots on identical games.
+
+```bash
+# train (CPU-friendly defaults, wraps the existing trainers)
+python -m harness.train dqn --episodes 300 --max_steps 500 --runs_dir runs/train
+python -m harness.train diffusion --episodes 100 --epochs 5 --out_dir runs/train/diffusion
+
+# deploy: play seeded episodes, print score/lines/pieces, record a GIF of the first seed
+python -m harness.play --bot beam --seeds 0,1,2 --pieces 100 --gif runs/play/beam.gif
+python -m harness.play --bot dqn:runs/train/<run>/checkpoint.pt --seeds 0 --gif runs/play/dqn.gif
+python -m harness.play --bot llm:openai/gpt-oss-20b --history stateless --seeds 1000 --pieces 50 --gif runs/play/oss20b.gif
+
+# several bots side by side in one GIF (same pieces)
+python -m harness.play --compare --bot greedy,beam,llm:openai/gpt-oss-20b --seeds 1000 --pieces 60 --gif runs/play/cmp.gif
+
+# replay logged LLM pilots (llm/run_pilot.py) as side-by-side GIFs, one column per arm/model
+python -m harness.replay --steps runs/explore/iter01/steps.csv --seed 1000
+```
+
+LLM bots need `TENSORMESH_API_KEY` in the environment; add `--mock` to run them offline.
+
+## Serverless LLM exploration (Tensormesh, KV-cache reuse)
+
+`llm/` uses Tetris as a controllable long-horizon workload for serverless open-model inference, with
+dense per-step regret as the quality signal. See `notes/tensormesh_probe.md` (platform probe),
+`notes/exploration_log.md` (iterations), and `notes/exploration_summary.md` (findings).
+
+```bash
+python -m llm.probe_tensormesh --out_dir runs/explore/probe              # Phase 0 probe
+python -m llm.run_pilot --config configs/explore/iter01.yaml [--mock]   # one pilot (paired seeds)
+python -m llm.analyze --dir runs/explore/iter01 --kind history          # table + figure
+python -m pytest tests -q                                               # offline tests (no API calls)
+```
+
 ## Pipeline
 
 The framework is structured into three stages:

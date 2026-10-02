@@ -1,0 +1,38 @@
+model,response_format,ok,status,error,valid_json,text,completion_tokens,latency_s
+google/gemma-4-31B-it,none,True,200,,False,"```json
+{""action_id"": 3}
+```",14,0.8088209100000086
+google/gemma-4-31B-it,json_object,True,200,,True,"{""action_id"": 3}",9,0.7049592339999435
+google/gemma-4-31B-it,json_schema,True,200,,True,"{""action_id"": 3}",9,0.618773463000025
+openai/gpt-oss-120b,none,True,200,,True,"{""action_id"": 7}",32,0.808720247999986
+openai/gpt-oss-120b,json_object,True,200,,True,"{""action_id"": 7}",31,0.5852036469999575
+openai/gpt-oss-120b,json_schema,True,200,,True,"{
+  ""action_id"": 7
+}",36,0.6980451050000056
+Qwen/Qwen3.5-397B-A17B-FP8,none,True,200,,True,"{""action_id"": 7}",8,0.7504562990000068
+Qwen/Qwen3.5-397B-A17B-FP8,json_object,True,200,,True,"{""action_id"": 7}",8,0.6730024319999757
+Qwen/Qwen3.5-397B-A17B-FP8,json_schema,True,200,,True,"{""action_id"": 7}",8,0.5813194109999813
+openai/gpt-oss-20b,none,True,200,,True,"{""action_id"": 7}",26,0.7213744059999954
+openai/gpt-oss-20b,json_object,True,200,,True,"{""action_id"":7}",29,0.5440478619999567
+openai/gpt-oss-20b,json_schema,True,200,,True,"{""action_id"": 7}",25,0.49452364299997953
+MiniMaxAI/MiniMax-M2.5,none,True,200,,True,"{""action_id"": 7}",120,1.6955977000000075
+MiniMaxAI/MiniMax-M2.5,json_object,True,200,,True,"{
+  ""action_id"": 7
+}",121,1.6040656519999175
+MiniMaxAI/MiniMax-M2.5,json_schema,True,200,,True,"{
+  ""action_id"": 7
+}",168,2.0631884340000397
+Qwen/Qwen3.8-27B-FP8,none,True,200,,True,"{""action_id"": 7}",8,0.7707816790000379
+Qwen/Qwen3.8-27B-FP8,json_object,True,200,,True,"{""action_id"": 3}",8,0.7053478249999898
+Qwen/Qwen3.8-27B-FP8,json_schema,True,200,,True,"{""action_id"": 3}",8,0.6129880269999148
+moonshotai/Kimi-K2.7-Code,none,True,200,,True,"{""action_id"": 7}",71,1.4640741420000722
+moonshotai/Kimi-K2.7-Code,json_object,True,200,,True,"{""action_id"": 7}",83,1.419802544999925
+moonshotai/Kimi-K2.7-Code,json_schema,True,200,,True,"{""action_id"": 7}",66,1.3600570990000733
+deepseek-ai/DeepSeek-V4-Flash,none,True,200,,True,"{""action_id"": 7}",8,0.7616944019999892
+deepseek-ai/DeepSeek-V4-Flash,json_object,True,200,,True,"{""action_id"": 7}",8,0.629415741999992
+deepseek-ai/DeepSeek-V4-Flash,json_schema,True,200,,True,"{""action_id"": 3}",8,0.47295700199993007
+lukealonso/GLM-5.2-NVFP4,none,True,200,,False,"```json
+{""action_id"": 7}
+```",12,0.9116989190000595
+lukealonso/GLM-5.2-NVFP4,json_object,True,200,,True,"{""action_id"": 7}",8,0.6831875899999886
+lukealonso/GLM-5.2-NVFP4,json_schema,True,200,,True,"{""action_id"": 7}",8,0.8416365799999994

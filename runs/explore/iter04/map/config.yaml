@@ -1,0 +1,44 @@
+iteration: 4
+name: lifetime_map_load12
+history_turns: 24
+stagger_s: 1.5
+rewarm_connection: true
+budget_usd: 1.0
+experiments:
+- model: google/gemma-4-31B-it
+  gaps_s:
+  - 5
+  - 30
+  - 120
+  - 600
+  trials: 3
+  tag: map12
+- model: MiniMaxAI/MiniMax-M2.5
+  gaps_s:
+  - 5
+  - 30
+  - 120
+  - 600
+  trials: 3
+  tag: map12
+- model: Qwen/Qwen3.8-27B-FP8
+  gaps_s:
+  - 5
+  - 30
+  - 120
+  - 600
+  trials: 3
+  tag: map12
+- model: Qwen/Qwen3.5-397B-A17B-FP8
+  gaps_s:
+  - 5
+  - 30
+  - 120
+  - 600
+  trials: 3
+  tag: map12
+- model: openai/gpt-oss-20b
+  gaps_s:
+  - 600
+  trials: 3
+  tag: rewarm_control

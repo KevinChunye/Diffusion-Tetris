@@ -1,0 +1,10 @@
+# Iteration 4B: self-load sweep. 16 concurrent distinct 15k-token agent contexts, 30 s idle, then probe.
+iteration: 4
+name: lifetime_load16
+history_turns: 24
+stagger_s: 0.3
+rewarm_connection: true
+budget_usd: 0.4
+experiments:
+  - {model: deepseek-ai/DeepSeek-V4-Flash, gaps_s: [30], trials: 16, tag: load16}
+  - {model: openai/gpt-oss-20b, gaps_s: [30], trials: 16, tag: load16}

@@ -28,7 +28,7 @@ class TetrisGym:
     """
 
     def __init__(self, width=10, height=20, max_steps=None, render_mode='skip', seed=None):
-        self.game = TetrisGame(width, height)
+        self.game = TetrisGame(width, height, seed=seed)
         self.max_steps = max_steps
         self.render_mode = render_mode
         self.step_count = 0
@@ -75,7 +75,9 @@ class TetrisGym:
         next_id, _ = self.game.next_piece
         return Observation(board, PIECE2IDX[curr_id], PIECE2IDX[next_id])
 
-    def reset(self) -> Observation:
+    def reset(self, seed=None) -> Observation:
+        if seed is not None:
+            self.game.seed(seed)  # episode's piece sequence depends only on `seed`
         self.game.reset_board()
         # `reset_board()` seeds `next_piece` but leaves `current_piece=None`.
         # Push the queue forward so `current_piece` is populated.

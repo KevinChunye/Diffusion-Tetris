@@ -19,7 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import copy
+import random
 from typing import List, Tuple, Dict
 
 import numpy as np
@@ -63,10 +63,10 @@ def _greedy_action(sim_env: TetrisGym) -> Action | None:
     return best_a
 
 
-def _rollout_teacher_sequence(env: TetrisGym, horizon: int) -> List[Action]:
-    """From current state, generate a greedy length<=H sequence."""
+def _rollout_teacher_sequence(env: TetrisGym, horizon: int, sim_seed: int | None = None) -> List[Action]:
+    """From current state, generate a greedy length<=H sequence (pieces past the preview are simulated)."""
     actions: List[Action] = []
-    sim_env = copy.deepcopy(env)
+    sim_env = env.clone_for_simulation(sim_seed)
 
     for _ in range(horizon):
         if sim_env.game.game_over:
@@ -84,6 +84,7 @@ def _rollout_teacher_sequence(env: TetrisGym, horizon: int) -> List[Action]:
 
 def collect_dataset(out_path: str, episodes: int, max_steps: int, horizon: int, width: int, height: int, seed: int):
     env = TetrisGym(width=width, height=height, max_steps=max_steps, render_mode="skip", seed=seed)
+    sim_rng = random.Random(seed + 1)
 
     boards = []
     curr_ids = []
@@ -92,15 +93,15 @@ def collect_dataset(out_path: str, episodes: int, max_steps: int, horizon: int, 
     x_seqs = []
     masks = []
 
-    for _ in range(episodes):
-        obs = env.reset()
+    for ep in range(episodes):
+        obs = env.reset(seed=seed + ep)
         done = False
         steps = 0
 
         while not done and steps < max_steps:
             board, curr_id, next_id = obs
 
-            seq = _rollout_teacher_sequence(env, horizon=horizon)
+            seq = _rollout_teacher_sequence(env, horizon=horizon, sim_seed=sim_rng.getrandbits(32))
             rot, xs, mask = action_seq_to_tokens(seq, horizon=horizon, width=width)
 
             boards.append(board.astype(np.uint8)[None, ...])

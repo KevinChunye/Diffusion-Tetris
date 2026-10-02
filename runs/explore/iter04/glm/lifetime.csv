@@ -1,0 +1,5 @@
+model,gap_s,trial,tag,keepalive_s,pings,ping_cost_usd,prompt_warm,cached_warm,latency_warm,prompt_probe,cached_probe,latency_probe,vllm_cached_probe,lmcache_cached_probe,actual_gap_s,ok,error,cost_usd
+lukealonso/GLM-5.2-NVFP4,5.0,0,sequential,0,0,0.0,13901,0,9.276842420999856,14791,0,1.0510380060004536,,,5.094728708267212,True,,0.040177599999999994
+lukealonso/GLM-5.2-NVFP4,5.0,0,sequential,0,0,0.0,13899,0,8.920458833000339,14789,0,0.9916523699994286,,,5.057961702346802,True,,0.040172
+lukealonso/GLM-5.2-NVFP4,30.0,0,sequential,0,0,0.0,13901,0,8.867867422999552,14791,0,1.0281432969995876,,,30.056978225708008,True,,0.040177599999999994
+lukealonso/GLM-5.2-NVFP4,30.0,0,sequential,0,0,0.0,13898,0,8.876445971000066,14788,0,0.9862366240004121,,,30.05585289001465,True,,0.0401692

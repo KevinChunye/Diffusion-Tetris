@@ -1,0 +1,18 @@
+iteration: 3
+name: cache_lifetime
+models:
+- openai/gpt-oss-20b
+- openai/gpt-oss-120b
+- moonshotai/Kimi-K2.7-Code
+- deepseek-ai/DeepSeek-V4-Flash
+- lukealonso/GLM-5.2-NVFP4
+gaps_s:
+- 0
+- 5
+- 30
+- 120
+- 600
+trials: 3
+history_turns: 24
+stagger_s: 1.0
+budget_usd: 2.0

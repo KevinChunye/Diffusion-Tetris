@@ -1,0 +1,14 @@
+# Tensormesh serverless price card, USD per 1M tokens.
+# `cached` is the price for prompt tokens served from the KV cache; null means
+# no cached price is listed and cached tokens are billed at the `input` price.
+# Model ids are the exact ids returned by GET /v1/models.
+models:
+  openai/gpt-oss-20b:            {input: 0.07, output: 0.28, cached: 0.0}
+  openai/gpt-oss-120b:           {input: 0.15, output: 0.60, cached: 0.0}
+  google/gemma-4-31B-it:         {input: 0.14, output: 0.56, cached: 0.0}
+  MiniMaxAI/MiniMax-M2.5:        {input: 0.30, output: 1.20, cached: 0.0}
+  moonshotai/Kimi-K2.7-Code:     {input: 0.96, output: 4.00, cached: 0.0}
+  deepseek-ai/DeepSeek-V4-Flash: {input: 0.14, output: 0.28, cached: null}
+  Qwen/Qwen3.8-27B-FP8:          {input: 0.32, output: 3.20, cached: null}
+  Qwen/Qwen3.5-397B-A17B-FP8:    {input: 0.60, output: 3.60, cached: null}
+  lukealonso/GLM-5.2-NVFP4:      {input: 1.40, output: 4.40, cached: null}

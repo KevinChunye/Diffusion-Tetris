@@ -1,0 +1,16 @@
+# Iteration 3: KV-cache lifetime under idle gaps (serverless agents idle between moves:
+# tool calls, human-in-the-loop, slow environments). Prefix = a real ~16k-token append-history
+# Tetris prompt; warm it, idle for `gap`, send the next turn; read cached tokens + prefill latency.
+iteration: 3
+name: cache_lifetime
+models:
+  - openai/gpt-oss-20b            # cached $0, fast prefill
+  - openai/gpt-oss-120b           # cached $0, reports vLLM-GPU vs LMCache split
+  - moonshotai/Kimi-K2.7-Code     # cached $0, reports split, slow prefill
+  - deepseek-ai/DeepSeek-V4-Flash # reports hits, no cached price, slow prefill
+  - lukealonso/GLM-5.2-NVFP4      # hits never reported; slowest prefill (TTFT is the only signal)
+gaps_s: [0, 5, 30, 120, 600]
+trials: 3
+history_turns: 24
+stagger_s: 1.0
+budget_usd: 2.0

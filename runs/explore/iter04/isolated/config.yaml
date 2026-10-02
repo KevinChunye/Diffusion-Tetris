@@ -1,0 +1,16 @@
+iteration: 4
+name: cache_lifetime_isolated_control
+history_turns: 24
+stagger_s: 0
+rewarm_connection: true
+budget_usd: 0.2
+experiments:
+- model: deepseek-ai/DeepSeek-V4-Flash
+  gaps_s:
+  - 30
+  - 10
+  - 30
+  - 10
+  trials: 1
+  tag: isolated
+  sequential: true

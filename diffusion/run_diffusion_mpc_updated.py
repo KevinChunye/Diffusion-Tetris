@@ -92,10 +92,11 @@ def _record_frame(env, frames, info, max_frames: int) -> None:
         frames.append(frame)
 
 
-def _run_episode(env, planner, max_steps: int, run_name: str, ep_num: int, decision_rows: list | None, record_frames: bool, video_max_steps: int):
-    obs = env.reset()
+def _run_episode(env, planner, max_steps: int, run_name: str, ep_num: int, decision_rows: list | None, record_frames: bool, video_max_steps: int, episode_seed: int | None = None):
+    obs = env.reset(seed=episode_seed)
     done = False
     steps = 0
+    lines_cleared = 0
     ep_decision_ms = []
     ep_masked_fracs = []
     ep_regrets = []
@@ -137,12 +138,14 @@ def _run_episode(env, planner, max_steps: int, run_name: str, ep_num: int, decis
             aid = valid[0]
         obs, _, done, info = env.step(aid)
         steps += 1
+        lines_cleared += int(info.get("lines_cleared", 0))
         if record_frames:
             _record_frame(env, frames, info=info, max_frames=video_max_steps)
 
     return {
         "score": float(env.game.score),
         "steps": int(steps),
+        "lines_cleared": int(lines_cleared),
         "decision_ms": ep_decision_ms,
         "invalid_count": int(invalid_count),
         "decision_count": int(decision_count),
@@ -229,9 +232,9 @@ def run_eval(args: argparse.Namespace) -> dict:
         resample_retries=args.resample_retries,
     )
 
-    planner = DiffusionMPCPlanner(model, cfg, device=device, critic=critic)
+    planner = DiffusionMPCPlanner(model, cfg, device=device, critic=critic, sim_seed=int(args.seed))
 
-    env = TetrisGym(width=args.width, height=args.height, max_steps=args.max_steps, render_mode="skip")
+    env = TetrisGym(width=args.width, height=args.height, max_steps=args.max_steps, render_mode="skip", seed=int(args.seed))
 
     run_name = args.run_name or (
         f"{args.rerank_mode}_{args.invalid_handling}"
@@ -265,6 +268,7 @@ def run_eval(args: argparse.Namespace) -> dict:
             decision_rows=decision_rows,
             record_frames=rec_now,
             video_max_steps=int(args.video_max_steps),
+            episode_seed=int(args.seed) + ep,
         )
         ep_scores.append(float(ep_result["score"]))
         all_regrets.extend(ep_result["regrets"])
@@ -278,6 +282,9 @@ def run_eval(args: argparse.Namespace) -> dict:
             extra={
                 "masked_fraction": float(ep_result["masked_fraction"]),
                 "regret": float(ep_result["regret"]),
+                "lines_cleared": float(ep_result["lines_cleared"]),
+                "pieces_placed": float(ep_result["steps"]),
+                "episode_seed": float(int(args.seed) + ep),
             },
         )
         if rec_now and ep_result["frames"]:
@@ -301,7 +308,7 @@ def run_eval(args: argparse.Namespace) -> dict:
                 render_mode="skip",
                 seed=int(args.seed),
             )
-            replay_planner = DiffusionMPCPlanner(model, cfg, device=device, critic=critic)
+            replay_planner = DiffusionMPCPlanner(model, cfg, device=device, critic=critic, sim_seed=int(args.seed))
             max_target = max(replay_set)
             for ep in range(max_target + 1):
                 rec_now = ep in replay_set
@@ -314,6 +321,7 @@ def run_eval(args: argparse.Namespace) -> dict:
                     decision_rows=None,
                     record_frames=rec_now,
                     video_max_steps=int(args.video_max_steps),
+                    episode_seed=int(args.seed) + ep,
                 )
                 if rec_now and ep_result["frames"]:
                     out_file = os.path.join(videos_dir, f"{run_name}_{args.video_select}_ep{ep+1:04d}.{args.video_format}")

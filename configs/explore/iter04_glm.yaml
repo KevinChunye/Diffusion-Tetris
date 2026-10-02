@@ -1,0 +1,9 @@
+# Iteration 4D: GLM-5.2 without self-induced queueing (one trial at a time).
+iteration: 4
+name: lifetime_glm_sequential
+history_turns: 24
+stagger_s: 0
+rewarm_connection: true
+budget_usd: 0.4
+experiments:
+  - {model: lukealonso/GLM-5.2-NVFP4, gaps_s: [5, 30, 5, 30], trials: 1, tag: sequential, sequential: true}

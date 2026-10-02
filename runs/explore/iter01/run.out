@@ -1,0 +1,16 @@
+[pilot] spent so far $0.057; this run capped at $5.000
+[pilot]         append seed 1000: pieces  30 lines   3 score     6  run $0.0416
+[pilot]         append seed 1001: pieces  32 lines   2 score     4  run $0.0442
+[pilot]         append seed 1002: pieces  34 lines   1 score     2  run $0.0544
+[pilot]        window8 seed 1000: pieces  45 lines   6 score    12  run $0.0614
+[pilot]      compact16 seed 1001: pieces  32 lines   2 score     4  run $0.0630
+[pilot]        window8 seed 1001: pieces  47 lines   5 score    11  run $0.0642
+[pilot]        window8 seed 1002: pieces  43 lines   4 score     8  run $0.0690
+[pilot]      compact16 seed 1000: pieces  46 lines   7 score    14  run $0.0693
+[pilot]      compact16 seed 1002: pieces  54 lines   7 score    15  run $0.0704
+[pilot]      stateless seed 1002: pieces  61 lines   9 score    19  run $0.0713
+[pilot]      stateless seed 1001: pieces  54 lines   8 score    17  run $0.0716
+[pilot]      stateless seed 1000: pieces 100 lines  30 score    71  run $0.0745
+[pilot] 578 calls in 116s, cost $0.0745
+[pilot] oracle on 578 states in 366s
+{'cost': 0.07447677999999996, 'calls': 578, 'wall_s': 115.82880020141602, 'out_dir': 'runs/explore/iter01'}

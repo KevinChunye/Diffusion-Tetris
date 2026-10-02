@@ -1,0 +1,5 @@
+model,gap_s,trial,tag,keepalive_s,pings,ping_cost_usd,prompt_warm,cached_warm,latency_warm,prompt_probe,cached_probe,latency_probe,vllm_cached_probe,lmcache_cached_probe,actual_gap_s,ok,error,cost_usd
+deepseek-ai/DeepSeek-V4-Flash,10.0,0,isolated,0,0,0.0,13919,0,3.208363984999778,14808,13824,0.3650020390005011,,,10.056020975112915,True,,0.004022340000000001
+deepseek-ai/DeepSeek-V4-Flash,10.0,0,isolated,0,0,0.0,13921,0,3.2641094609998618,14810,13824,0.36409102899961,,,10.055646896362305,True,,0.004022900000000001
+deepseek-ai/DeepSeek-V4-Flash,30.0,0,isolated,0,0,0.0,13919,0,3.8614497720000145,14808,13824,0.4278106570000091,,,30.061034440994263,True,,0.004022340000000001
+deepseek-ai/DeepSeek-V4-Flash,30.0,0,isolated,0,0,0.0,13920,0,3.210074120000172,14809,13824,0.5560425100002249,,,30.101996660232544,True,,0.004022620000000001
