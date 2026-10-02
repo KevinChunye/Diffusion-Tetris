@@ -1,0 +1,37 @@
+model,variant,ok,status,error,completion_tokens,reasoning_chars,answer,correct,ttft_s,latency_s,prompt_tokens,cached_tokens
+google/gemma-4-31B-it,default,True,200,,4,0,391,True,0.7183478480000076,0.7893354199999862,28,0
+google/gemma-4-31B-it,effort_low,True,200,,230,517,391,True,0.4837111699999923,5.851399937999986,31,0
+google/gemma-4-31B-it,enable_thinking_false,True,200,,4,0,391,True,0.4563813159999768,0.5274892699999896,28,0
+google/gemma-4-31B-it,thinking_false,True,200,,4,0,391,True,0.5446351859999936,0.5964446019999627,28,0
+openai/gpt-oss-120b,default,True,200,,76,186,391,True,0.846129666999957,1.245432892999986,80,0
+openai/gpt-oss-120b,effort_low,True,200,,22,26,391,True,0.5192209180000305,0.6284983040000043,80,32
+openai/gpt-oss-120b,enable_thinking_false,True,200,,76,193,391,True,0.47718205000001035,0.8763092120000238,80,64
+openai/gpt-oss-120b,thinking_false,True,200,,45,115,391,True,0.4750123879999819,0.7091360599999916,80,64
+Qwen/Qwen3.5-397B-A17B-FP8,default,True,200,,332,880,391,True,0.7817496530000199,4.39144279300001,25,0
+Qwen/Qwen3.5-397B-A17B-FP8,effort_low,True,200,,354,870,391,True,0.47915126200001623,4.3333793919999835,25,0
+Qwen/Qwen3.5-397B-A17B-FP8,enable_thinking_false,True,200,,4,0,391,True,0.5257384699999648,0.5598726779999765,27,0
+Qwen/Qwen3.5-397B-A17B-FP8,thinking_false,True,200,,310,701,391,True,0.47509382199996253,3.8488176539999586,25,0
+openai/gpt-oss-20b,default,True,200,,94,215,391,True,0.7213638509999782,1.1109915249999744,80,32
+openai/gpt-oss-20b,effort_low,True,200,,19,18,391,True,0.45314463800002613,0.5232162110000331,80,64
+openai/gpt-oss-20b,enable_thinking_false,True,200,,111,257,391,True,0.49032958300000473,0.9224498579999931,80,64
+openai/gpt-oss-20b,thinking_false,True,200,,66,137,391,True,0.509430860000009,0.7706719829999997,80,64
+MiniMaxAI/MiniMax-M2.5,default,True,200,,79,266,391,True,0.8422874880000109,1.6150686110000265,51,0
+MiniMaxAI/MiniMax-M2.5,effort_low,True,200,,93,312,391,True,0.5044084280000334,1.3915861660000246,51,48
+MiniMaxAI/MiniMax-M2.5,enable_thinking_false,True,200,,64,261,391,True,0.44403755999996974,1.048499645999982,51,48
+MiniMaxAI/MiniMax-M2.5,thinking_false,True,200,,88,327,391,True,0.43252486199997975,1.2789405249999959,51,48
+Qwen/Qwen3.8-27B-FP8,default,True,200,,32,78,391,True,0.7484396130000164,1.4173743370000125,67,0
+Qwen/Qwen3.8-27B-FP8,effort_low,True,200,,62,110,391,True,0.45492571099998713,1.776402456000028,55,0
+Qwen/Qwen3.8-27B-FP8,enable_thinking_false,True,200,,4,0,391,True,0.5096528269999681,0.5848662230000059,27,0
+Qwen/Qwen3.8-27B-FP8,thinking_false,True,200,,64,136,391,True,0.49745476300000746,1.8596599169999877,67,0
+moonshotai/Kimi-K2.7-Code,default,True,200,,29,92,391,True,0.7613542949999896,1.0945303830000057,21,0
+moonshotai/Kimi-K2.7-Code,effort_low,True,200,,33,73,391,True,0.4701495870000372,0.8584744270000328,21,16
+moonshotai/Kimi-K2.7-Code,enable_thinking_false,True,200,,19,0,We need answer 17*23 = 391. Just the num,True,0.4369911430000002,0.6448977839999657,21,16
+moonshotai/Kimi-K2.7-Code,thinking_false,True,200,,63,0,We need answer 17*23. Just the number. C,True,0.4815655149999998,1.225906321000025,21,16
+deepseek-ai/DeepSeek-V4-Flash,default,True,200,,2,0,391,True,0.7734820860000013,0.7890827850000051,17,0
+deepseek-ai/DeepSeek-V4-Flash,effort_low,True,200,,2,0,391,True,0.566959206999968,0.5897600710000006,17,0
+deepseek-ai/DeepSeek-V4-Flash,enable_thinking_false,True,200,,2,0,391,True,0.5403299559999937,0.5525320820000275,17,0
+deepseek-ai/DeepSeek-V4-Flash,thinking_false,True,200,,2,0,391,True,0.5349814659999765,0.5512927439999658,17,0
+lukealonso/GLM-5.2-NVFP4,default,True,200,,126,296,391,True,0.8591344540000136,2.768408000000022,25,0
+lukealonso/GLM-5.2-NVFP4,effort_low,True,200,,133,377,391,True,0.5302111970000283,2.6954898980000053,25,0
+lukealonso/GLM-5.2-NVFP4,enable_thinking_false,True,200,,3,0,391,True,0.6058747049999624,0.6416405840000152,19,0
+lukealonso/GLM-5.2-NVFP4,thinking_false,True,200,,155,0,1.  **Analyze the Request:** The user wa,True,0.5995520999999826,3.0646342079999727,25,0

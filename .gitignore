@@ -48,8 +48,9 @@ temp/
 *.mp4
 *.webm
 
-# Project run artifacts
-runs/
+# Project run artifacts (runs/explore/ holds small, reviewed exploration outputs and is tracked)
+runs/*
+!runs/explore/
 datasets/
 checkpoints/
 

@@ -1,0 +1,16 @@
+# Per-model request settings that minimise reasoning tokens (from the Phase 0
+# thinking probe, runs/explore/probe/thinking.csv). Passed as kwargs to
+# TensormeshClient.chat(). `reasoning_effort: null` means "do not send it":
+# on gemma-4 it *enables* thinking; enable_thinking=false is the off-switch for
+# gemma/Qwen/GLM; MiniMax always reasons; Kimi leaks reasoning into `content`
+# when thinking is disabled, so it keeps reasoning (separated) at low effort.
+models:
+  openai/gpt-oss-20b:            {reasoning_effort: low}
+  openai/gpt-oss-120b:           {reasoning_effort: low}
+  google/gemma-4-31B-it:         {reasoning_effort: null, extra_body: {chat_template_kwargs: {enable_thinking: false}}}
+  Qwen/Qwen3.5-397B-A17B-FP8:    {reasoning_effort: null, extra_body: {chat_template_kwargs: {enable_thinking: false}}}
+  Qwen/Qwen3.8-27B-FP8:          {reasoning_effort: null, extra_body: {chat_template_kwargs: {enable_thinking: false}}}
+  lukealonso/GLM-5.2-NVFP4:      {reasoning_effort: null, extra_body: {chat_template_kwargs: {enable_thinking: false}}}
+  MiniMaxAI/MiniMax-M2.5:        {reasoning_effort: null}
+  moonshotai/Kimi-K2.7-Code:     {reasoning_effort: low}
+  deepseek-ai/DeepSeek-V4-Flash: {reasoning_effort: null}
