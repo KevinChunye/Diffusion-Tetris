@@ -36,19 +36,21 @@ def caption(frame: np.ndarray, text: str, height: int = 34) -> np.ndarray:
     return np.asarray(out)
 
 
-def side_by_side(columns: Sequence[List[np.ndarray]], scale: float = 0.6) -> List[np.ndarray]:
-    """Compose per-bot frame lists into one GIF; shorter episodes hold their last frame."""
+def side_by_side(columns: Sequence[List[np.ndarray]], scale: float = 0.6, ncols: int = 0) -> List[np.ndarray]:
+    """Compose per-bot frame lists into one GIF (a row, or a grid with `ncols` tiles per row);
+    shorter episodes hold their last frame."""
     n = max(len(c) for c in columns)
+    ncols = ncols or len(columns)
     out = []
     for i in range(n):
         tiles = [Image.fromarray(c[min(i, len(c) - 1)]) for c in columns]
         if scale != 1.0:
             tiles = [t.resize((int(t.width * scale), int(t.height * scale))) for t in tiles]
-        canvas = Image.new("RGB", (sum(t.width for t in tiles), max(t.height for t in tiles)), SURFACE)
-        x = 0
-        for t in tiles:
-            canvas.paste(t, (x, 0))
-            x += t.width
+        tw, th = max(t.width for t in tiles), max(t.height for t in tiles)
+        nrows = -(-len(tiles) // ncols)
+        canvas = Image.new("RGB", (tw * min(ncols, len(tiles)), th * nrows), SURFACE)
+        for j, t in enumerate(tiles):
+            canvas.paste(t, ((j % ncols) * tw, (j // ncols) * th))
         out.append(np.asarray(canvas))
     return out
 

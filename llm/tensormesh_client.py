@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import sys
 import threading
 import time
@@ -178,7 +179,9 @@ class TensormeshClient:
         try:
             r = self._session().get(f"{self.base_url}/models", timeout=30)
         except requests.exceptions.ProxyError as exc:
-            raise TensormeshUnreachable(f"{ALLOWLIST_HINT} ({exc})") from exc
+            if any(code in str(exc) for code in ("403", "407", "Forbidden")):
+                raise TensormeshUnreachable(f"{ALLOWLIST_HINT} ({exc})") from exc
+            raise
         if self._is_proxy_block(r):
             raise TensormeshUnreachable(ALLOWLIST_HINT)
         r.raise_for_status()
@@ -227,7 +230,11 @@ class TensormeshClient:
             except TensormeshUnreachable:
                 raise
             except requests.exceptions.ProxyError as exc:
-                raise TensormeshUnreachable(f"{ALLOWLIST_HINT} ({exc})") from exc
+                # Only a 403/407 answered by the egress proxy means "host not allowlisted"; other proxy
+                # failures (relay tunnel closed mid-exchange, resets) are transient and retried.
+                if any(code in str(exc) for code in ("403", "407", "Forbidden")):
+                    raise TensormeshUnreachable(f"{ALLOWLIST_HINT} ({exc})") from exc
+                status, err = -1, f"ProxyError: {exc}"
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
                     requests.exceptions.ChunkedEncodingError) as exc:
                 status, err = -1, f"{type(exc).__name__}: {exc}"
@@ -241,7 +248,7 @@ class TensormeshClient:
                 res.ok = False
                 res.error = err or f"HTTP {status}"
                 break
-            sleep_s = min(self.backoff_cap_s, self.backoff_base_s * (2 ** attempt))
+            sleep_s = min(self.backoff_cap_s, self.backoff_base_s * (2 ** attempt)) * random.uniform(0.75, 1.25)
             attempt += 1
             res.retries = attempt
             self._log_retry(model, attempt, status, err, sleep_s, meta)

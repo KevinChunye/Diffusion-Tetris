@@ -94,7 +94,8 @@ def _end_labels(ax, ends):
     lo, hi = ax.get_ylim()
     min_gap = 0.045 * (hi - lo)
     placed: List[float] = []
-    for y, x, text in sorted(ends):
+    order = pd.DataFrame(ends, columns=["y", "x", "text"]).sort_values("y")
+    for y, x, text in order.itertuples(index=False):
         if all(abs(y - p) >= min_gap for p in placed):
             ax.annotate(text, (x, y), xytext=(4, 0), textcoords="offset points", va="center", fontsize=8,
                         color=plotstyle.INK_2)
@@ -248,7 +249,7 @@ def capacity_tables(d: str):
     import glob
 
     parts = []
-    for f in sorted(glob.glob(os.path.join(d, "*", "lifetime.csv"))):
+    for f in pd.Series(glob.glob(os.path.join(d, "*", "lifetime.csv")), dtype=str).sort_values():
         x = pd.read_csv(f)
         x["phase"] = os.path.basename(os.path.dirname(f))
         parts.append(x)
@@ -473,8 +474,10 @@ def main() -> None:
         parts = []
         for m in dict.fromkeys(a.split("/")[0] for a in order):
             keep = [a for a in order if a.startswith(m + "/")]
-            parts.append(paired(eps[eps["arm"].isin(keep)], steps[steps["arm"].isin(keep)], f"{m}/{base_policy}", metrics))
-        pairs = pd.concat(parts, ignore_index=True)
+            base = f"{m}/{base_policy}" if f"{m}/{base_policy}" in keep else keep[0]
+            if len(keep) > 1:
+                parts.append(paired(eps[eps["arm"].isin(keep)], steps[steps["arm"].isin(keep)], base, metrics))
+        pairs = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
     else:
         pairs = paired(eps, steps, args.baseline or order[0], metrics)
     print(write_tables(args.dir, summary, pairs))

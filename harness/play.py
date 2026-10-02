@@ -74,6 +74,7 @@ def main() -> None:
     ap.add_argument("--gif", default="", help="record the first seed to this GIF")
     ap.add_argument("--compare", action="store_true", help="one side-by-side GIF for all bots in --bot")
     ap.add_argument("--fps", type=int, default=4)
+    ap.add_argument("--ncols", type=int, default=0, help="--compare: tiles per row (default: one row)")
     ap.add_argument("--max_frames", type=int, default=400)
     ap.add_argument("--csv", default="", help="per-step log")
     ap.add_argument("--device", default="cpu")
@@ -105,7 +106,7 @@ def main() -> None:
                 if not args.compare:
                     print("GIF:", write_gif(frames, args.gif, fps=args.fps))
     if args.compare and args.gif and gif_columns:
-        print("GIF:", write_gif(side_by_side(gif_columns), args.gif, fps=args.fps))
+        print("GIF:", write_gif(side_by_side(gif_columns, ncols=args.ncols), args.gif, fps=args.fps))
     table = pd.DataFrame(summaries).groupby("bot", sort=False).agg(
         episodes=("episode_seed", "size"), pieces=("pieces", "mean"), lines=("lines", "mean"), score=("score", "mean"),
         topped_out=("topped_out", "mean"), fallbacks=("fallbacks", "sum"), sec_per_decision=("sec_per_decision", "mean"),

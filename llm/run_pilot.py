@@ -87,8 +87,13 @@ def run(cfg: Dict[str, Any], out_dir: str, mock: bool, workers: int, skip_oracle
     def one(job):
         arm, seed = job
         rows: List[Dict[str, Any]] = []
-        meta = {"arm": arm, "model": arms[arm].model}
-        ep = run_episode(LLMPolicy(client, arms[arm]), seed, max_pieces, meta, rows, should_stop=stop)
+        meta = {"arm": arm, "model": arms[arm].model, "episode_seed": seed}
+        try:
+            ep = run_episode(LLMPolicy(client, arms[arm]), seed, max_pieces, meta, rows, should_stop=stop)
+        except Exception as exc:  # keep the other episodes' (paid) data; mark this one as crashed
+            ep = dict(meta, score=float("nan"), lines_cleared=0, pieces_placed=len(rows), topped_out=False,
+                      stop_reason=f"crash: {type(exc).__name__}: {str(exc)[:200]}")
+            print(f"[pilot] {arm} seed {seed} crashed: {exc}", flush=True)
         with lock:
             steps.extend(rows)
             episodes.append(ep)
