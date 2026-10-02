@@ -1,0 +1,56 @@
+iteration: 2
+name: history_x_pricecard
+model: openai/gpt-oss-20b
+seeds:
+- 1000
+- 1001
+- 1002
+- 1003
+max_pieces: 100
+budget_usd: 5.0
+concurrency: 16
+oracle:
+  n_samples: 2
+  depth: 4
+  beam_h: 2
+  beam_w: 4
+  beam_samples: 1
+defaults:
+  annotated: true
+  max_tokens: 1024
+  response_format: none
+  layout: static_first
+arms:
+  oss20b/stateless:
+    model: openai/gpt-oss-20b
+    history: stateless
+  oss20b/append:
+    model: openai/gpt-oss-20b
+    history: append
+  oss20b/window8:
+    model: openai/gpt-oss-20b
+    history: window
+    window: 8
+  oss120b/stateless:
+    model: openai/gpt-oss-120b
+    history: stateless
+  oss120b/append:
+    model: openai/gpt-oss-120b
+    history: append
+  oss120b/window8:
+    model: openai/gpt-oss-120b
+    history: window
+    window: 8
+  dsv4flash/stateless:
+    model: deepseek-ai/DeepSeek-V4-Flash
+    history: stateless
+    max_tokens: 64
+  dsv4flash/append:
+    model: deepseek-ai/DeepSeek-V4-Flash
+    history: append
+    max_tokens: 64
+  dsv4flash/window8:
+    model: deepseek-ai/DeepSeek-V4-Flash
+    history: window
+    window: 8
+    max_tokens: 64

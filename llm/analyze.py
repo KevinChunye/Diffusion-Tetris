@@ -243,6 +243,60 @@ def plot_lifetime(g: pd.DataFrame, title: str, out_png: str) -> None:
     plt.close(fig)
 
 
+def capacity_tables(d: str):
+    """Iteration-4 style: subdirs of lifetime runs (load1..16, keepalive, isolated, glm, map)."""
+    import glob
+
+    parts = []
+    for f in sorted(glob.glob(os.path.join(d, "*", "lifetime.csv"))):
+        x = pd.read_csv(f)
+        x["phase"] = os.path.basename(os.path.dirname(f))
+        parts.append(x)
+    lt = pd.concat(parts, ignore_index=True)
+    lt["hit"] = (lt["cached_probe"] > 0.5 * lt["prompt_probe"]) | (lt["latency_probe"] < 0.3 * lt["latency_warm"])
+    lt["reported_hit"] = lt["cached_probe"] > 0.5 * lt["prompt_probe"]
+    load = lt[lt["phase"].str.startswith("load")].copy()
+    load["contexts"] = load["phase"].str.replace("load", "").astype(int)
+    cap = load.groupby(["model", "contexts"]).agg(
+        trials=("trial", "size"), hit_rate=("hit", "mean"), probe_p50=("latency_probe", "median"),
+        warm_p50=("latency_warm", "median"), warm_max=("latency_warm", "max")).reset_index()
+    other = lt[~lt["phase"].str.startswith("load")].groupby(["phase", "model", "tag", "gap_s"]).agg(
+        trials=("trial", "size"), hit_rate=("hit", "mean"), reported_hit_rate=("reported_hit", "mean"),
+        cold_p50=("latency_warm", "median"), probe_p50=("latency_probe", "median"), pings=("pings", "mean"),
+        cost=("cost_usd", "sum")).reset_index()
+    return lt, cap, other
+
+
+def plot_capacity(cap: pd.DataFrame, title: str, out_png: str) -> None:
+    plotstyle.setup()
+    import matplotlib.pyplot as plt
+
+    models = list(dict.fromkeys(cap["model"]))
+    colors = plotstyle.colors_for(models)
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.4), constrained_layout=True)
+    for m in models:
+        d = cap[cap["model"] == m].sort_values("contexts")
+        label = m.split("/")[-1]
+        axes[0].plot(d["contexts"], d["hit_rate"], color=colors[m], marker="o", markersize=6, label=label)
+        axes[1].plot(d["contexts"], d["probe_p50"], color=colors[m], marker="o", markersize=6, label=label)
+        axes[1].plot(d["contexts"], d["warm_p50"], color=colors[m], linestyle=(0, (1, 2)), linewidth=1.5)
+    for ax in axes:
+        ax.set_xscale("log", base=2)
+        ax.set_xticks([1, 4, 8, 16])
+        ax.set_xticklabels(["1", "4", "8", "16"])
+        ax.set_xlabel("concurrent distinct 15k-token agent contexts (ours)")
+    axes[0].set_title("Next turn hits the cache after 30 s idle", loc="left")
+    axes[0].set_ylabel("hit rate")
+    axes[0].set_ylim(-0.03, 1.03)
+    axes[0].legend(loc="center right")
+    axes[1].set_title("Next-turn latency (solid) vs cold prefill (dotted)", loc="left")
+    axes[1].set_ylabel("seconds (log scale, median)")
+    axes[1].set_yscale("log")
+    fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
+    fig.savefig(out_png, dpi=150)
+    plt.close(fig)
+
+
 def write_tables(d: str, summary: pd.DataFrame, pairs: pd.DataFrame) -> str:
     md = "### Per-arm summary\n\n" + summary.round(4).to_markdown(index=False)
     if not pairs.empty:
@@ -260,6 +314,19 @@ def main() -> None:
     ap.add_argument("--kind", default="history")
     ap.add_argument("--baseline", default="")
     args = ap.parse_args()
+    if args.kind == "capacity":
+        lt, cap, other = capacity_tables(args.dir)
+        md = ("### Cache hit after 30 s idle vs concurrent contexts\n\n" + cap.round(3).to_markdown(index=False)
+              + "\n\n### Other phases (isolated control, keep-alive, GLM sequential, catalog map)\n\n"
+              + other.round(3).to_markdown(index=False))
+        cap.to_csv(os.path.join(args.dir, "summary_capacity.csv"), index=False)
+        other.to_csv(os.path.join(args.dir, "summary_other.csv"), index=False)
+        with open(os.path.join(args.dir, "summary.md"), "w", encoding="utf-8") as f:
+            f.write(md + "\n")
+        print(md)
+        plot_capacity(cap, "Iteration 4: how many agent contexts does a deployment keep warm? (30 s idle, 15k tokens each)",
+                      os.path.join(args.dir, "figure.png"))
+        return
     if args.kind == "lifetime":
         with open(os.path.join(args.dir, "config.yaml"), "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
@@ -288,7 +355,9 @@ def main() -> None:
     else:
         pairs = paired(eps, steps, args.baseline or order[0], metrics)
     print(write_tables(args.dir, summary, pairs))
-    title = f"Iteration {cfg.get('iteration')}: {cfg.get('name')} ({cfg.get('model')}, {len(cfg['seeds'])} seeds x {cfg['max_pieces']} pieces)"
+    models_used = list(dict.fromkeys(a.split("/")[0] for a in order)) if all("/" in a for a in order) else [cfg.get("model")]
+    title = (f"Iteration {cfg.get('iteration')}: {cfg.get('name')} ({', '.join(models_used)}; "
+             f"{len(cfg['seeds'])} seeds x {cfg['max_pieces']} pieces)")
     if args.kind == "history":
         plot_history(steps, order, title, os.path.join(args.dir, "figure.png"))
     elif args.kind == "models":

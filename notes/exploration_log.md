@@ -94,7 +94,7 @@ DeepSeek runs without reasoning (`max_tokens=64`); gpt-oss uses `reasoning_effor
 **Budget.** Projected from iteration-1 token profiles: ≤ $2.8 worst case (if every episode lasts
 100 pieces; DeepSeek-append alone ≈ $0.45/episode). Cap $5. Cumulative before this iteration: $0.13.
 
-### Iteration 2 results (`runs/explore/iter02/`)
+### Iteration 2 results (`runs/explore/iter02/`: `summary.md`, `figure.png`, `replay_seed1000.gif`)
 Spend $0.87 (1999 calls, 0 retries). $ per 100 decisions and cached share:
 
 | model (cached price) | stateless | append | window8 |
@@ -117,10 +117,22 @@ Pieces survived per seed (1000–1003):
 - On DeepSeek-V4-Flash, append is the **most expensive** policy, 10.4× stateless and 2.1× window8.
   84% of its prompt is a reported cache hit, but every token is still billed. The cache works, and
   the price card throws the saving away.
-- Quality (piece counts here; regret is added when the oracle finishes):
-  - Long append history hurts both gpt-oss sizes in 4/4 seeds.
-  - The 8-turn window is nearly harmless for gpt-oss-120b but not for gpt-oss-20b.
-  - DeepSeek-V4-Flash with no reasoning plays poorly in every arm.
+- Quality (oracle regret per decision; normalized score in brackets):
+
+  | model | stateless | append | window8 |
+  |:--|:--|:--|:--|
+  | gpt-oss-20b | 0.95 [0.45] | 4.37 [0.08] | 2.96 [0.09] |
+  | gpt-oss-120b | **0.55 [0.70]** | 3.20 [0.20] | 1.08 [0.65] |
+  | DeepSeek-V4-Flash | 3.83 [0.09] | 4.01 [0.09] | 1.90 [0.17] |
+
+  - Append-only history raises regret in 4/4 seeds on both gpt-oss sizes: paired +3.5 (t=7.5) on 20b
+    and +2.6 (t=19.5) on 120b, and roughly halves survival.
+  - The 8-turn window is nearly harmless for gpt-oss-120b (+0.5 regret, t=1.9, normalized score
+    0.65 vs 0.70) but not for 20b.
+  - DeepSeek-V4-Flash without reasoning plays poorly in every arm and emits 7–14% illegal/unparseable
+    ids. The fallback placements muddy its regret.
+  - So the most cache-friendly memory (append) is also the one that damages decisions most, on both
+    model sizes.
 - TTFT: DeepSeek-V4-Flash sits at a 2.2–2.4 s median in every arm under this load (p90 ≈ 5 s), so
   queueing swamps prefill. On gpt-oss-120b, window8 adds +0.23 s median TTFT over stateless.
 
@@ -179,26 +191,38 @@ Rubric: (1) DeepSeek's cliff is 10× with 3/3 trials on each side of it; (2) one
 
 ---
 
-## Iteration 4: map cache lifetime across the catalog + keep-alive mitigation
+## Iteration 4: is it lifetime or capacity? Load sweep + keep-alive + catalog map
+
+**Correction from a control run (`runs/explore/iter04/isolated/`, $0.016).** DeepSeek-V4-Flash was
+re-run **one trial at a time**, with no other traffic from us. It kept the prefix across 10 s and
+30 s gaps: 13.8k/14.8k tokens cached, about 0.4 s per probe, 4/4 trials. So iteration 3's "< 30 s"
+was not an idle timeout. Our own 15 concurrent 15k-token contexts (plus whatever other tenants
+did) either **evicted each other** or got the probe **routed to a replica without the prefix**.
+The serving property to measure is how many concurrent agent contexts a deployment keeps warm, not
+an idle timeout.
 
 **Hypotheses.**
-(a) DeepSeek-V4-Flash's lifetime is a sharp cliff somewhere in 5–30 s (idle-time eviction rather
-than gradual LRU churn).
-(b) Keep-alive pings faster than the lifetime keep the prefix warm. On a no-cached-price model each
-ping is billed at full price, so keep-alive buys latency with money.
-(c) The other four catalog models each have their own lifetime, so "how long can my agent think
-between moves" depends on the deployment.
-(d) GLM, measured without self-induced queueing, hits at short gaps too.
-(e) The 10-min latency uptick disappears when the HTTP connection is re-warmed before the probe.
+(a) The hit rate after a fixed 30 s gap falls as the number of concurrent distinct contexts we hold
+grows (N = 1, 4, 8, 16) on DeepSeek-V4-Flash, but not on gpt-oss-20b.
+(b) Under the same load, contexts that re-send their prefix every 4 s keep it (LRU refresh), while
+silent contexts lose it. Each refresh is billed at full price on a no-cached-price model.
+(c) The remaining catalog models, at iteration 3's load (12 contexts per model), show their own
+survival profiles.
+(d) GLM, measured sequentially, hits at short gaps too.
+(e) The 10-min latency uptick disappears when the HTTP connection is re-warmed.
 
-**Why it matters.** An agent framework could choose its keep-alive cadence, or pick a model, based
-on a measured lifetime. A platform could expose the lifetime, or offer a cheap keep-alive, the way
-CDNs expose TTLs.
+**Why it matters.** Multi-agent workloads put many long contexts on the same deployment at once:
+parallel episodes, fan-out, many users. If a deployment can keep only a few warm, a fleet of agents
+thrashes its own cache and pays cold prefill on every move. That is a capacity number a serverless
+platform could publish, and a client could respect by capping concurrency or keeping contexts alive.
 
-**Config.** `configs/explore/iter04.yaml`. Same 24-turn Tetris prefix and method as iteration 3, plus
-a connection re-warm (GET /v1/models) right before every probe. DeepSeek gaps 8/12/16/20/25 s.
-DeepSeek 60 s gaps with keep-alive every 4 s and every 15 s. gemma-4, MiniMax-M2.5, Qwen3.8,
-Qwen3.5 at gaps 5/30/120/600 s. GLM at 5 and 30 s run sequentially. 3 trials each (GLM 2).
+**Config.** Phases (configs under `configs/explore/`):
+- `iter04_load{1,4,8,16}.yaml`: run one after another, DeepSeek-V4-Flash and gpt-oss-20b side by
+  side, gap 30 s.
+- `iter04_keepalive.yaml`: 16 DeepSeek contexts, gap 60 s; 8 ping every 4 s, 8 stay silent.
+- `iter04_map.yaml`: gemma-4, MiniMax-M2.5, Qwen3.8, Qwen3.5 at gaps 5/30/120/600 s with 12
+  concurrent contexts per model, plus the gpt-oss-20b 10-min re-warm control.
+- `iter04_glm.yaml`: GLM, sequential, gaps 5/30 s.
+Same 24-turn Tetris prefix as iteration 3. The HTTP connection is re-warmed before every probe.
 
-**Budget.** ≈ $1.0 (keep-alive pings ≈ $0.002 each on DeepSeek; Qwen3.5 is the dearest model).
-Cap $2. Cumulative before: $1.93.
+**Budget.** ≈ $1.0 (keep-alive pings ≈ $0.002 each); cap $2. Cumulative before: $1.94.

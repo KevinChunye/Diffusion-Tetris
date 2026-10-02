@@ -3,3 +3,10 @@ iteration,label,cost_usd,n_calls,utc
 1,history_policies,0.074477,578,2026-10-02T15:15:54Z
 2,history_x_pricecard,0.868922,1999,2026-10-02T15:33:10Z
 3,cache_lifetime,0.927955,150,2026-10-02T15:46:20Z
+4,cache_lifetime_isolated_control,0.01609,8,2026-10-02T15:50:33Z
+4,lifetime_load1,0.00507,4,2026-10-02T15:52:04Z
+4,lifetime_load4,0.020278,16,2026-10-02T15:52:55Z
+4,lifetime_glm_sequential,0.160696,8,2026-10-02T15:53:21Z
+4,lifetime_load8,0.040561,32,2026-10-02T15:53:59Z
+4,lifetime_load16,0.081123,64,2026-10-02T15:55:37Z
+4,lifetime_keepalive_load16,0.095559,48,2026-10-02T15:58:14Z
