@@ -98,6 +98,8 @@ def cell_summary(g: pd.DataFrame, duration_s: float) -> Dict[str, float]:
            "short_p95_endpoint_first_chunk_s": _q(s["endpoint_first_chunk_s"].dropna(), .95),
            "short_p95_chunk_to_valid_s": _q(s["chunk_to_valid_s"].dropna(), .95),
            "short_slo_miss_rate": float(1 - s["useful"].mean()) if len(s) else np.nan,
+           "short_invalid_rate": float((~np.isfinite(s["ttva"])).mean()) if len(s) else np.nan,
+           "x_short_p95_ttva_valid_only": _q(s["ttva"][np.isfinite(s["ttva"])], .95),
            "long_p50_ttva": _q(lg["ttva"], .5), "long_p95_ttva": _q(lg["ttva"], .95),
            "long_max_queue_s": float(lg["queue_s"].max()) if len(lg) else np.nan,
            "useful_per_s": float(d["useful"].sum() / (n_blocks * duration_s)) if len(d) else np.nan,
@@ -147,9 +149,17 @@ def paired_bootstrap(arrays: Dict, stat: Callable[[np.ndarray], float], n: int, 
         return {}
 
     def compare(tv, cv):
+        # +inf statistics (e.g. p95 when >5% of decisions never became valid) are kept: finite vs +inf is
+        # +inf (or -100%), and +inf vs +inf is undefined (nan) and reported as such, never dropped silently.
         a, b = stat(tv), stat(cv)
+        if np.isnan(a) or np.isnan(b) or (np.isinf(a) and np.isinf(b)):
+            return np.nan
         if relative:
-            return a / b - 1 if np.isfinite(a) and np.isfinite(b) and b != 0 else np.nan
+            if np.isinf(a):
+                return np.inf
+            if np.isinf(b):
+                return -1.0
+            return a / b - 1 if b != 0 else np.nan
         return a - b
 
     tv = np.concatenate([arrays[b][0] for b in blocks])
@@ -165,11 +175,11 @@ def paired_bootstrap(arrays: Dict, stat: Callable[[np.ndarray], float], n: int, 
             tt.append(t[idx])
             cc.append(c[idx])
         reps[i] = compare(np.concatenate(tt), np.concatenate(cc))
-    finite = reps[np.isfinite(reps)]
-    lo, hi = (np.quantile(finite, [0.025, 0.975]) if finite.size else (np.nan, np.nan))
+    defined = reps[~np.isnan(reps)]
+    lo, hi = (np.quantile(defined, [0.025, 0.975], method="inverted_cdf") if defined.size else (np.nan, np.nan))
     per_block = [compare(*arrays[b]) for b in blocks]
     return {"point": float(point), "ci95_lo": float(lo), "ci95_hi": float(hi), "n_blocks": len(blocks),
-            "n_requests": int(len(tv)), "boot_finite_frac": float(finite.size / n),
+            "n_requests": int(len(tv)), "boot_defined_frac": float(defined.size / n),
             "per_block": [round(float(x), 4) for x in per_block]}
 
 
@@ -185,7 +195,10 @@ def comparisons(df: pd.DataFrame, acfg: Dict, n: int, seed: int) -> pd.DataFrame
              ("long_p50_ttva_diff_s", ("long",), "ttva", p50, False),
              ("legal_rate_diff", DECISION, "legal_rate", np.mean, False),
              ("regret_diff", DECISION, "regret", nanmean, False),
-             ("ping_p95_diff_s", ("ping",), "ping_s", lambda x: _q(x[np.isfinite(x)], .95), False)]
+             ("ping_p95_diff_s", ("ping",), "ping_s", lambda x: _q(x[np.isfinite(x)], .95), False),
+             # exploratory (not preregistered): tails among decisions that did become valid, and the invalid rate
+             ("x_short_p95_ttva_valid_only_rel", ("short",), "ttva", lambda x: _q(x[np.isfinite(x)], .95), True),
+             ("x_short_invalid_rate_diff", ("short",), "ttva", lambda x: float(np.mean(~np.isfinite(x))), False)]
     rows = []
     for label in ("h1", "h2", "b2"):
         treat, ctrl = acfg[label]["treatment"], acfg[label]["control"]
@@ -209,19 +222,27 @@ def verdicts(cmp: pd.DataFrame, acfg: Dict) -> Dict[str, Dict[str, str]]:
         r = cmp[(cmp.comparison == label) & (cmp.model == model) & (cmp.metric == metric)]
         return r.iloc[0] if len(r) else None
 
+    def pct(x):
+        return "undefined" if np.isnan(x) else ("+inf" if np.isposinf(x) else f"{x:+.0%}")
+
+    def ci(r):
+        return f"{pct(r['point'])} [{pct(r['ci95_lo'])}, {pct(r['ci95_hi'])}]"
+
     for model in sorted(cmp["model"].unique()):
         v = {}
         rel, diff, ping = get("h1", model, "short_p95_ttva_rel"), get("h1", model, "short_p95_ttva_diff_s"), \
             get("h1", model, "ping_p95_diff_s")
-        if rel is not None:
+        if rel is not None and np.isnan(rel["point"]):
+            v["H1"] = "undefined: short p95 TTVA is +inf in both conditions"
+        elif rel is not None:
             above_path = ping is None or not np.isfinite(ping["point"]) or diff["point"] > abs(ping["point"])
             if rel["ci95_lo"] > 0 and above_path:
-                v["H1"] = (f"supported: short p95 TTVA {rel['point']:+.0%} [{rel['ci95_lo']:+.0%}, {rel['ci95_hi']:+.0%}] "
+                v["H1"] = (f"supported: short p95 TTVA {ci(rel)} "
                            f"with long requests mixed in (path-probe p95 shift {ping['point'] if ping is not None else float('nan'):+.2f} s)")
             elif rel["ci95_hi"] < 0:
-                v["H1"] = f"refuted (opposite sign): {rel['point']:+.0%} [{rel['ci95_lo']:+.0%}, {rel['ci95_hi']:+.0%}]"
+                v["H1"] = f"refuted (opposite sign): {ci(rel)}"
             else:
-                v["H1"] = (f"not supported: {rel['point']:+.0%} [{rel['ci95_lo']:+.0%}, {rel['ci95_hi']:+.0%}]"
+                v["H1"] = (f"not supported: {ci(rel)}"
                            + ("" if above_path else "; shift not above path-probe variation"))
         h2 = get("h2", model, "short_p95_ttva_rel")
         if h2 is not None:
@@ -233,11 +254,14 @@ def verdicts(cmp: pd.DataFrame, acfg: Dict) -> Dict[str, Dict[str, str]]:
             useful_ok = guard(ur, lambda r: r["ci95_lo"] > -float(ni["useful_rate_rel"]))
             legal_ok = guard(lr, lambda r: r["ci95_lo"] > -float(ni["legal_rate_pp"]) / 100)
             regret_ok = guard(rg, lambda r: r["ci95_hi"] < float(ni["regret"]))
-            effect = f"short p95 {h2['point']:+.0%} [{h2['ci95_lo']:+.0%}, {h2['ci95_hi']:+.0%}]"
+            effect = f"short p95 {ci(h2)}"
             fmt = lambda ok: "n/a" if ok is None else str(ok)  # noqa: E731
             guards = (f"useful/s noninferior={fmt(useful_ok)}, legal-rate noninferior={fmt(legal_ok)}, "
                       f"regret noninferior={fmt(regret_ok)}")
-            if h2["ci95_hi"] <= need and all(ok is not False for ok in (useful_ok, legal_ok, regret_ok)):
+            if np.isnan(h2["point"]):
+                v["H2"] = (f"undefined: short p95 TTVA is +inf in both conditions (>5% of short decisions never "
+                           f"became valid); {guards}")
+            elif h2["ci95_hi"] <= need and all(ok is not False for ok in (useful_ok, legal_ok, regret_ok)):
                 v["H2"] = f"supported: {effect}; {guards}"
             elif h2["ci95_lo"] > need:
                 v["H2"] = f"refuted (CI excludes a {-need:.0%} reduction): {effect}; {guards}"
@@ -245,7 +269,7 @@ def verdicts(cmp: pd.DataFrame, acfg: Dict) -> Dict[str, Dict[str, str]]:
                 v["H2"] = f"inconclusive: {effect}; {guards}"
         b2 = get("b2", model, "short_p95_ttva_rel")
         if b2 is not None:
-            v["B2"] = f"priority hints vs fifo: short p95 {b2['point']:+.0%} [{b2['ci95_lo']:+.0%}, {b2['ci95_hi']:+.0%}]"
+            v["B2"] = f"priority hints vs fifo: short p95 {ci(b2)}"
         out[model] = v
     return out
 
@@ -268,6 +292,43 @@ def overlap_table(df: pd.DataFrame) -> pd.DataFrame:
         return t
     return (t.groupby(["model", "condition", "longs_prefilling"])["endpoint_first_chunk_s"]
              .agg(n="size", p50="median", p95=lambda x: _q(x, .95)).reset_index())
+
+
+def fisher_two_sided(a: int, b: int, c: int, d: int) -> float:
+    """Fisher exact test for the 2x2 table [[a, b], [c, d]] (two-sided, sum of tables no more likely)."""
+    from math import comb
+
+    r1, c1, n = a + b, a + c, a + b + c + d
+    def prob(x):
+        return comb(c1, x) * comb(n - c1, r1 - x) / comb(n, r1)
+    p0 = prob(a)
+    lo, hi = max(0, r1 + c1 - n), min(r1, c1)
+    return float(min(1.0, sum(prob(x) for x in range(lo, hi + 1) if prob(x) <= p0 * (1 + 1e-9))))
+
+
+def exploratory_tables(df: pd.DataFrame, ref: str = "fifo", base: str = "short_only") -> pd.DataFrame:
+    """Exploratory, not preregistered. Short decisions only, per model and condition:
+    - invalid rate (no strictly valid legal JSON action) with Fisher's exact p vs `base`
+    - agreement of the proposed action with `ref` on the same (block, request). Prompts differ across
+      conditions by their random namespace, so disagreement mixes prompt sensitivity and server
+      nondeterminism; it is not attributable to load."""
+    out = []
+    s = df[df["kind"] == "short"]
+    for model, g in s.groupby("model"):
+        piv = g.pivot_table(index=["block", "rid"], columns="condition", values="proposed_id", aggfunc="first")
+        inv = g.assign(inv=~np.isfinite(g["ttva"])).groupby("condition")["inv"].agg(["sum", "size"])
+        for cond in sorted(g["condition"].unique()):
+            row = {"model": model, "condition": cond, "n_short": int(inv.loc[cond, "size"]),
+                   "n_invalid": int(inv.loc[cond, "sum"])}
+            if base in inv.index and cond != base:
+                a, n1 = int(inv.loc[cond, "sum"]), int(inv.loc[cond, "size"])
+                c, n2 = int(inv.loc[base, "sum"]), int(inv.loc[base, "size"])
+                row["fisher_p_vs_" + base] = fisher_two_sided(a, n1 - a, c, n2 - c)
+            if ref in piv and cond != ref:
+                both = piv[[cond, ref]].dropna()
+                row["agree_with_" + ref] = float((both[cond] == both[ref]).mean()) if len(both) else np.nan
+            out.append(row)
+    return pd.DataFrame(out)
 
 
 def plot(df: pd.DataFrame, path: Path, title: str) -> None:
@@ -306,17 +367,17 @@ def _md(df: pd.DataFrame) -> str:
 
 
 def write_report(d: Path, evidence: str, pooled: pd.DataFrame, cmp: pd.DataFrame, overlap: pd.DataFrame,
-                 verdict: Dict) -> None:
+                 verdict: Dict, explore: pd.DataFrame = None) -> None:
     """report.md: tables generated from the CSVs of this run directory (nothing typed by hand)."""
     keep = ["model", "condition", "n_blocks", "n_short", "n_long", "short_p50_ttva", "short_p95_ttva", "short_p99_ttva",
             "short_p95_queue_s", "short_p50_endpoint_first_chunk_s", "short_p95_endpoint_first_chunk_s",
-            "short_slo_miss_rate", "long_p50_ttva", "long_p95_ttva", "long_max_queue_s", "useful_per_s",
+            "short_slo_miss_rate", "short_invalid_rate", "x_short_p95_ttva_valid_only", "long_p50_ttva", "long_p95_ttva", "long_max_queue_s", "useful_per_s",
             "legal_rate", "mean_regret", "ping_p50_s", "ping_p95_s", "n_error", "n_unsent_or_rejected",
             "n_invalid_reply", "n_cache_usage_reported", "n_cached_tokens_positive", "max_cached_tokens", "est_cost_usd"]
     pooled = pooled[[c for c in keep if c in pooled]].copy()
     pooled["model"] = pooled["model"].str.split("/").str[-1]
     c = cmp[["comparison", "model", "treatment", "control", "metric", "point", "ci95_lo", "ci95_hi", "n_blocks",
-             "n_requests", "per_block"]].copy()
+             "n_requests", "boot_defined_frac", "per_block"]].copy()
     c["model"] = c["model"].str.split("/").str[-1]
     parts = [f"# {evidence} interference results: {d.name}", "",
              "Generated by `python -m llm.interference_analysis`. TTVA in seconds from scheduled arrival; "
@@ -325,6 +386,12 @@ def write_report(d: Path, evidence: str, pooled: pd.DataFrame, cmp: pd.DataFrame
     for model, v in verdict.items():
         parts += [f"- **{model}**"] + [f"  - {k}: {t}" for k, t in v.items()]
     parts += ["", "## Pooled per condition", "", _md(pooled), "", "## Paired comparisons", "", _md(c)]
+    if explore is not None and not explore.empty:
+        e = explore.copy()
+        e["model"] = e["model"].str.split("/").str[-1]
+        parts += ["", "## Exploratory (not preregistered): short-decision validity and answer agreement", "",
+                  "Prompts differ across conditions by their random namespace, so answer disagreement mixes prompt "
+                  "sensitivity and server nondeterminism and is not attributable to load.", "", _md(e)]
     if not overlap.empty:
         o = overlap.copy()
         o["model"] = o["model"].str.split("/").str[-1]
@@ -353,7 +420,10 @@ def analyze(run_dir: str, n_boot: int = None) -> Dict:
     overlap.to_csv(d / "overlap.csv", index=False)
     out = {"evidence": evidence, "run_dir": str(d), "n_bootstrap": n, "verdicts": verdict}
     (d / "verdicts.json").write_text(json.dumps(out, indent=2))
-    write_report(d, evidence, pooled, cmp, overlap, verdict)
+    explore = exploratory_tables(df) if not manifest.get("simulated") else None
+    if explore is not None:
+        explore.to_csv(d / "exploratory.csv", index=False)
+    write_report(d, evidence, pooled, cmp, overlap, verdict, explore)
     plot(df, d / "short_ttva_cdf.png", f"{evidence}: short-request TTVA by condition ({d.name})")
     return out
 

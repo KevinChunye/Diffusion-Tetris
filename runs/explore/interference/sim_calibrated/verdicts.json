@@ -4,7 +4,7 @@
   "n_bootstrap": 2000,
   "verdicts": {
     "deepseek_like_1replica": {
-      "H1": "supported: short p95 TTVA +2419% [+862%, +2630%] with long requests mixed in (path-probe p95 shift -0.00 s)",
+      "H1": "supported: short p95 TTVA +2419% [+850%, +2630%] with long requests mixed in (path-probe p95 shift -0.00 s)",
       "H2": "supported: short p95 -72% [-77%, -50%]; useful/s noninferior=True, legal-rate noninferior=n/a, regret noninferior=n/a",
       "B2": "priority hints vs fifo: short p95 +0% [+0%, +0%]"
     },

@@ -1,5 +1,11 @@
 # Exploration summary: Tetris as a KV-cache workload for serverless open-model inference
 
+> **Follow-up (iteration 8): long-context interference.** On two hosted endpoints, a tenant's own
+> ~19k-token requests raised its ~1k-token decisions' p95 time-to-valid-action from 0.9 s to 15 s
+> (gemma-4-31B-it). Starting longs only when no short is pending cut that by 69%, at equal cost;
+> `priority` hints had no observable effect. See [`interference_study.md`](interference_study.md)
+> (LIVE vs SIMULATED evidence kept separate; the quality guard is not yet established).
+
 Branch `tensormesh_kv_explore`, 2026-10-02. Six iterations plus a Phase 0 probe, total API spend
 **$5.18** of the $25 cap (`runs/explore/spend.csv`). Every number below links to a table and
 figure under `runs/explore/`. The full reasoning trail is in `notes/exploration_log.md`, and the

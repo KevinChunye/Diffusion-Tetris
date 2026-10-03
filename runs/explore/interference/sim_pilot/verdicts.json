@@ -4,8 +4,8 @@
   "n_bootstrap": 2000,
   "verdicts": {
     "serialized_prefill": {
-      "H1": "supported: short p95 TTVA +977% [+535%, +1214%] with long requests mixed in (path-probe p95 shift +0.00 s)",
-      "H2": "supported: short p95 -60% [-67%, -30%]; useful/s noninferior=True, legal-rate noninferior=n/a, regret noninferior=n/a",
+      "H1": "supported: short p95 TTVA +977% [+532%, +1214%] with long requests mixed in (path-probe p95 shift +0.00 s)",
+      "H2": "supported: short p95 -60% [-68%, -30%]; useful/s noninferior=True, legal-rate noninferior=n/a, regret noninferior=n/a",
       "B2": "priority hints vs fifo: short p95 +0% [+0%, +0%]"
     },
     "wide_fast": {

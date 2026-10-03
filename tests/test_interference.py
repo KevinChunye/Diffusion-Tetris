@@ -326,3 +326,24 @@ def test_overlap_table_counts_longs_still_waiting_for_their_first_chunk():
     rows["endpoint_first_chunk_s"] = rows["first_chunk_s"] - rows["admit_s"]
     t = overlap_table(rows).set_index("longs_prefilling")
     assert t.loc[1, "p50"] == 5.0 and t.loc[0, "p50"] == 0.5
+
+
+def test_fisher_exact_matches_known_values():
+    from llm.interference_analysis import fisher_two_sided
+
+    assert fisher_two_sided(1, 9, 11, 3) == pytest.approx(0.002759, rel=1e-3)  # R: fisher.test(matrix(c(1,11,9,3),2))
+    assert fisher_two_sided(5, 5, 5, 5) == pytest.approx(1.0)
+
+
+def test_infinite_tails_are_reported_not_dropped():
+    import numpy as np
+
+    from llm.interference_analysis import paired_bootstrap
+
+    bad = np.array([1.0] * 18 + [np.inf] * 2)
+    good = np.ones(20)
+    p95 = lambda x: float(np.quantile(x, .95, method="higher"))  # noqa: E731
+    up = paired_bootstrap({0: (bad, good)}, p95, 100, 0, True)
+    assert up["point"] == np.inf
+    both = paired_bootstrap({0: (bad, bad)}, p95, 100, 0, True)
+    assert np.isnan(both["point"])

@@ -20,3 +20,4 @@ iteration,label,cost_usd,n_calls,utc
 8,interference live pilot (live_pilot),0.012632,53,2026-10-03T00:58:14Z
 8,"interference live attempt 1 correction (interrupted replay rows + in-flight reservations, conservative)",0.01554,40,2026-10-03T00:58:40Z
 8,interference calibration (calibration_gemma),0.006041,4,2026-10-03T00:59:43Z
+8,interference live pilot (live_pilot_v2),0.659553,1570,2026-10-03T01:31:32Z
