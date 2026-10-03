@@ -35,6 +35,13 @@ from tetris_render import (BG, BOARD_BG, GOOD, MUTED, PANEL, TEXT, Move, PanelSt
                            step_states, ui_colors)
 
 ACCENTS = [(110, 160, 255), (255, 170, 80), (120, 220, 160), (235, 120, 205), (200, 200, 90), (150, 130, 255)]
+# One color per model, shared with the paper's figures (paper/figures.py), so color follows the model.
+MODEL_ACCENTS = {"gemma-4-31B": (42, 120, 214), "DeepSeek-V4-Flash": (235, 104, 52), "gpt-oss-20b": (27, 175, 122),
+                 "gpt-oss-120b": (124, 108, 230), "beam": (163, 162, 157), "greedy": (120, 119, 115)}
+
+
+def accent_for(name: str, i: int):
+    return next((c for k, c in MODEL_ACCENTS.items() if name.startswith(k)), ACCENTS[i % len(ACCENTS)])
 
 
 @dataclass
@@ -196,7 +203,7 @@ def save_gif(frames: List[Image.Image], durations: List[int], path: str, colors:
     sheet = Image.new("RGB", (w, h * len(sample)))
     for i, f in enumerate(sample):
         sheet.paste(f, (0, i * h))
-    fixed = ui_colors(ACCENTS)  # exact piece/UI colors first, so no piece color is ever merged away
+    fixed = ui_colors(ACCENTS + list(MODEL_ACCENTS.values()))  # exact piece/UI colors first, never merged away
     learned = sheet.quantize(colors=min(colors, 255 - len(fixed)), method=Image.Quantize.MEDIANCUT)
     lp = learned.getpalette()[: 3 * min(colors, 255 - len(fixed))]
     extra = [tuple(lp[i:i + 3]) for i in range(0, len(lp), 3)]
@@ -258,12 +265,12 @@ def main() -> None:
         if ep.empty:
             raise SystemExit(f"arm {arm!r} has no episode for seed {args.seed}")
         model = str(ep["model"].iloc[0]).split("/")[-1] if "model" in ep else arm
-        runs.append(record_agent(args.seed, ep["used_id"].tolist(), model, ACCENTS[i % len(ACCENTS)], ep["board"].tolist()))
+        runs.append(record_agent(args.seed, ep["used_id"].tolist(), model, accent_for(model, i), ep["board"].tolist()))
     pieces = args.pieces or max(len(r.moves) for r in runs)
     for bot in filter(None, args.bots.split(",")):
         ep = bot_steps(bot, args.seed, pieces)
         runs.append(record_agent(args.seed, ep["used_id"].tolist(), f"{bot} search bot",
-                                 ACCENTS[len(runs) % len(ACCENTS)], ep["board"].tolist()))
+                                 accent_for(bot, len(runs)), ep["board"].tolist()))
     print(f"same pieces verified at {check_same_pieces(runs)} (agent, move) positions across {len(runs)} agents")
     frames, durations = build_frames(runs, args.seed, ncols=args.ncols, cell=args.cell)
     out = args.out or os.path.join(os.path.dirname(args.steps), f"compare_seed{args.seed}.gif")

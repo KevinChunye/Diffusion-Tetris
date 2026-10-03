@@ -91,6 +91,9 @@ LLM bots need `TENSORMESH_API_KEY` in the environment; add `--mock` to run them 
 
 ## Serverless LLM exploration (Tensormesh, KV-cache reuse)
 
+**Paper draft:** [Not Just the Weights: What Tetris Reveals About Serving Open-Weight Agents](paper/paper.pdf)
+([source](paper/paper.html); `python paper/build.py` rebuilds every figure from `runs/explore/` and the PDF).
+
 For the proposed open-weight Tetris benchmark, see the
 [research protocol and experiment plan](notes/tetris_benchmark_protocol.md) and
 [`configs/benchmark/pilot.yaml`](configs/benchmark/pilot.yaml). The protocol separates
