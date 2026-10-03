@@ -85,6 +85,18 @@ validate the harness only; they are not real-model benchmark results.
 dense per-step regret as the quality signal. See `notes/tensormesh_probe.md` (platform probe),
 `notes/exploration_log.md` (iterations), and `notes/exploration_summary.md` (findings).
 
+**Long-context interference study (iteration 8).** Do a tenant's long-context requests delay its short
+decision requests on a hosted endpoint, and does client-side admission help? See
+[`notes/interference_study.md`](notes/interference_study.md) (results, with LIVE and SIMULATED evidence
+kept separate) and [`notes/interference_novelty_matrix.md`](notes/interference_novelty_matrix.md)
+(overlap audit and preregistration).
+
+```bash
+python -m llm.interference_pilot sim  --config configs/interference/pilot_v2.yaml --out <fresh dir>   # SIMULATED
+python -m llm.interference_pilot live --config configs/interference/pilot_v2.yaml --out <fresh dir>   # LIVE, <= $1 est.
+python -m llm.interference_analysis <run dir>                                                         # paired bootstrap
+```
+
 ```bash
 python -m llm.probe_tensormesh --out_dir runs/explore/probe              # Phase 0 probe
 python -m llm.run_pilot --config configs/explore/iter01.yaml [--mock]   # one pilot (paired seeds)

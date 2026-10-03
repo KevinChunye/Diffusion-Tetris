@@ -298,3 +298,31 @@ def test_interrupted_runs_charge_in_flight_requests_at_their_reservation(tmp_pat
         {"run_id": "a", "rid": "s1", "reserved_usd": 0.01}, {"run_id": "a", "rid": "l1", "reserved_usd": 0.02},
         {"run_id": "b", "rid": "s1", "reserved_usd": 0.01})))
     assert accounted_spend(tmp_path) == pytest.approx(0.001 + 0.02 + 0.01)
+
+
+def test_paired_bootstrap_is_zero_for_identical_conditions_and_tracks_a_shift():
+    import numpy as np
+
+    from llm.interference_analysis import paired_bootstrap
+
+    rng = np.random.default_rng(0)
+    base = {b: rng.exponential(1.0, 40) for b in range(4)}
+    same = paired_bootstrap({b: (x, x) for b, x in base.items()}, lambda x: np.quantile(x, .95), 200, 0, True)
+    assert same["point"] == 0 and same["ci95_lo"] == same["ci95_hi"] == 0
+    doubled = paired_bootstrap({b: (2 * x, x) for b, x in base.items()}, lambda x: np.quantile(x, .95), 200, 0, True)
+    assert doubled["point"] == pytest.approx(1.0) and doubled["ci95_lo"] == pytest.approx(1.0)
+    with_inf = {b: (np.where(np.arange(40) == 0, np.inf, x), x) for b, x in base.items()}
+    res = paired_bootstrap(with_inf, lambda x: float(np.mean(np.isfinite(x))), 200, 0, False)
+    assert res["point"] == pytest.approx(-1 / 40)  # failures stay in the sample instead of vanishing
+
+
+def test_overlap_table_counts_longs_still_waiting_for_their_first_chunk():
+    from llm.interference_analysis import overlap_table
+
+    rows = pd.DataFrame([
+        {"model": "m", "block": 0, "condition": "fifo", "kind": "long", "admit_s": 0.0, "first_chunk_s": 5.0, "complete_s": 5.1},
+        {"model": "m", "block": 0, "condition": "fifo", "kind": "short", "admit_s": 1.0, "first_chunk_s": 6.0},
+        {"model": "m", "block": 0, "condition": "fifo", "kind": "short", "admit_s": 7.0, "first_chunk_s": 7.5}])
+    rows["endpoint_first_chunk_s"] = rows["first_chunk_s"] - rows["admit_s"]
+    t = overlap_table(rows).set_index("longs_prefilling")
+    assert t.loc[1, "p50"] == 5.0 and t.loc[0, "p50"] == 0.5
