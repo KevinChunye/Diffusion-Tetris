@@ -72,6 +72,15 @@ LLM bots need `TENSORMESH_API_KEY` in the environment; add `--mock` to run them 
 
 ## Serverless LLM exploration (Tensormesh, KV-cache reuse)
 
+For the proposed open-weight Tetris benchmark, see the
+[research protocol and experiment plan](notes/tetris_benchmark_protocol.md) and
+[`configs/benchmark/pilot.yaml`](configs/benchmark/pilot.yaml). The protocol separates
+gameplay quality, frozen-state prefix-cache replay, and serving-load/deadline experiments.
+New runs distinguish model decisions from fallbacks and missing telemetry from reported zero hits.
+Use `python -m llm.cache_replay --help` for paired cache probes and
+`python -m llm.benchmark_report --help` for episode-level summaries. Offline `--mock` runs
+validate the harness only; they are not real-model benchmark results.
+
 `llm/` uses Tetris as a controllable long-horizon workload for serverless open-model inference, with
 dense per-step regret as the quality signal. See `notes/tensormesh_probe.md` (platform probe),
 `notes/exploration_log.md` (iterations), and `notes/exploration_summary.md` (findings).

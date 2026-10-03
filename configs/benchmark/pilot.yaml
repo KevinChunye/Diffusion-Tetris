@@ -1,0 +1,22 @@
+# Development pilot, not held-out leaderboard data. Prices/catalog must be rechecked live.
+iteration: 7
+name: tetris_quality_memory_pilot
+model: openai/gpt-oss-20b
+seeds: [2000, 2001, 2002, 2003]
+max_pieces: 50
+budget_usd: 1.0
+concurrency: 2
+client: {max_retries: 0, timeout_s: 60}
+reference_csv: runs/benchmark/reference_scores.csv
+oracle: {n_samples: 2, depth: 4, beam_h: 2, beam_w: 4, beam_samples: 1}
+defaults:
+  annotated: false
+  max_tokens: 256
+  response_format: json_object
+  temperature: 0
+  layout: static_first
+arms:
+  raw_stateless: {history: stateless}
+  raw_append: {history: append}
+  raw_window8: {history: window, window: 8}
+  assisted_stateless: {history: stateless, annotated: true}

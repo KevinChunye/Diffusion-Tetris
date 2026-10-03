@@ -113,7 +113,7 @@ class LLMPolicy:
                                temperature=self.cfg.temperature, meta=dict(meta, turn=turn, history_turns=n_hist),
                                **self.cfg.chat_kwargs)
         proposed = parse_action(res.text, legal_ids) if res.ok else None
-        late = self.cfg.deadline_ms is not None and res.latency_s * 1000.0 > float(self.cfg.deadline_ms)
+        late = self.cfg.deadline_ms is not None and res.end_to_end_s * 1000.0 > float(self.cfg.deadline_ms)
         user_msg = msgs[-1]["content"]
         return proposed, res, outcomes, user_msg, late, n_hist
 
@@ -164,6 +164,9 @@ def run_episode(policy: LLMPolicy, episode_seed: int, max_pieces: int, meta: Dic
             "created_cache_tokens": res.created_cache_tokens, "completion_tokens": res.completion_tokens,
             "ttft_s": res.ttft_s, "ttft_token_s": res.ttft_token_s, "latency_s": res.latency_s,
             "cost_usd": res.cost_usd, "prompt_chars": res.prompt_chars, "t_start": res.t_start,
+            "end_to_end_s": res.end_to_end_s, "usage_reported": res.usage_reported,
+            "cache_usage_reported": res.cache_usage_reported, "cost_estimate_known": res.cost_estimate_known,
+            "model_action_accepted": not bool(reason),
             "reply": res.text[:80], "reasoning_chars": len(res.reasoning), "finish_reason": res.finish_reason,
             "max_height_before": stats["max_height"], "holes_before": stats["holes"],
         })
