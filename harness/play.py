@@ -73,7 +73,9 @@ def main() -> None:
     ap.add_argument("--pieces", type=int, default=100)
     ap.add_argument("--gif", default="", help="record the first seed to this GIF")
     ap.add_argument("--compare", action="store_true", help="one side-by-side GIF for all bots in --bot")
-    ap.add_argument("--fps", type=int, default=4)
+    ap.add_argument("--style", default="pretty", choices=["pretty", "classic"],
+                    help="pretty: colored animated renderer (tetris_render); classic: the matplotlib board")
+    ap.add_argument("--fps", type=int, default=4, help="classic style only")
     ap.add_argument("--ncols", type=int, default=0, help="--compare: tiles per row (default: one row)")
     ap.add_argument("--max_frames", type=int, default=400)
     ap.add_argument("--csv", default="", help="per-step log")
@@ -91,14 +93,16 @@ def main() -> None:
     specs = args.bot.split(",") if args.compare else [args.bot]
     kw = dict(device=args.device, history=args.history, window=args.window, compact_every=args.compact_every,
               max_tokens=args.max_tokens, num_candidates=args.num_candidates, horizon=args.horizon, mock=args.mock)
-    summaries, all_rows, gif_columns = [], [], []
+    summaries, all_rows, gif_columns, first_seed = [], [], [], []
     for spec in specs:
         bot = make_bot(spec, **kw)
         for i, seed in enumerate(seeds):
-            record = bool(args.gif) and i == 0
+            record = bool(args.gif) and i == 0 and args.style == "classic"
             s, rows, frames = play_episode(bot, seed, args.pieces, record=record, max_frames=args.max_frames)
             summaries.append(s)
             all_rows.extend(rows)
+            if i == 0:
+                first_seed.append((bot.name, [r["used_id"] for r in rows]))
             print(f"{s['bot']:>28s} seed {seed}: pieces {s['pieces']:4d} lines {s['lines']:4d} score {s['score']:6.0f} "
                   f"fallbacks {s['fallbacks']:3d}  {s['sec_per_decision']:.3f}s/decision  ${s['cost_usd']:.4f}", flush=True)
             if record:
@@ -107,6 +111,13 @@ def main() -> None:
                     print("GIF:", write_gif(frames, args.gif, fps=args.fps))
     if args.compare and args.gif and gif_columns:
         print("GIF:", write_gif(side_by_side(gif_columns, ncols=args.ncols), args.gif, fps=args.fps))
+    if args.gif and args.style == "pretty":
+        from harness.compare_gif import ACCENTS, build_frames, check_same_pieces, record_agent, save_gif
+
+        runs = [record_agent(seeds[0], ids, name, ACCENTS[j % len(ACCENTS)]) for j, (name, ids) in enumerate(first_seed)]
+        check_same_pieces(runs)
+        frames, durations = build_frames(runs, seeds[0], ncols=args.ncols or min(2, len(runs)))
+        print("GIF:", save_gif(frames, durations, args.gif))
     table = pd.DataFrame(summaries).groupby("bot", sort=False).agg(
         episodes=("episode_seed", "size"), pieces=("pieces", "mean"), lines=("lines", "mean"), score=("score", "mean"),
         topped_out=("topped_out", "mean"), fallbacks=("fallbacks", "sum"), sec_per_decision=("sec_per_decision", "mean"),

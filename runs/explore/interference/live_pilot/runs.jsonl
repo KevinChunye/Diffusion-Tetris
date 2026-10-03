@@ -1,0 +1,1 @@
+{"run_id": "gpt-oss-20b_b0_defer_long", "condition": "defer_long", "stop": "completed", "estimated_cost_usd": 0.01263185, "n_rows": 73, "n_items": 73, "wall_s": 41.686017514000014, "model": "openai/gpt-oss-20b", "block": 0, "trace_seed": 800, "trace_sha256": "054889bdbdf706fc36b0a0b9abc77a9a73198201984694dea7095959e3ec6dd0", "live": true, "mock": false}

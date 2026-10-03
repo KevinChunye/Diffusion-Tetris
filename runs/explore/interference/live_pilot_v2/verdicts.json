@@ -1,0 +1,17 @@
+{
+  "evidence": "LIVE",
+  "run_dir": "runs/explore/interference/live_pilot_v2",
+  "n_bootstrap": 2000,
+  "verdicts": {
+    "deepseek-ai/DeepSeek-V4-Flash": {
+      "H1": "supported: short p95 TTVA +inf [+772%, +inf] with long requests mixed in (path-probe p95 shift +0.16 s)",
+      "H2": "undefined: short p95 TTVA is +inf in both conditions (>5% of short decisions never became valid); useful/s noninferior=True, legal-rate noninferior=True, regret noninferior=False",
+      "B2": "priority hints vs fifo: short p95 undefined [-100%, +inf]"
+    },
+    "google/gemma-4-31B-it": {
+      "H1": "supported: short p95 TTVA +1577% [+726%, +1866%] with long requests mixed in (path-probe p95 shift +0.21 s)",
+      "H2": "inconclusive: short p95 -69% [-74%, -41%]; useful/s noninferior=True, legal-rate noninferior=True, regret noninferior=False",
+      "B2": "priority hints vs fifo: short p95 -1% [-11%, +7%]"
+    }
+  }
+}

@@ -37,6 +37,7 @@ class TetrisGym:
         self.step_count = 0
         self.valid_actions: list[tuple[int, int]] = []  # cached per step
         self.frames = []  # cached matplotlib figs for gif
+        self.visual = None  # optional tetris_render.ColorBoard (see enable_visual)
 
         # Precompute the full action space: (rotation_idx, x_position)
         self.full_action_space = self._build_action_space()
@@ -53,6 +54,15 @@ class TetrisGym:
                 pass
 
         self.reset()
+
+    def enable_visual(self) -> "TetrisGym":
+        """Opt in to colored rendering (render(mode="pretty")). Tracks which tetromino each cell came
+        from, checked against the board after every step. Off by default; lookahead clones never carry it."""
+        from tetris_render import ColorBoard
+
+        self.visual = ColorBoard(self.game.height, self.game.width)
+        self.visual.cells[self.game.board != 0] = "I"  # unknown origin of any pre-existing blocks
+        return self
 
     @property
     def action_size(self) -> int:
@@ -84,6 +94,8 @@ class TetrisGym:
         self.valid_actions = self.game.get_valid_actions()
         self.step_count = 0
         self.frames = []
+        if self.visual is not None:
+            self.visual.reset()
         return self._obs()
 
     def step(self, action_id: int):
@@ -91,8 +103,11 @@ class TetrisGym:
             raise RuntimeError("Cannot step in a finished episode. Call reset().")
 
         rot_idx, x = self.id_to_action[action_id]
+        piece = self.game.current_piece[0]
         info = self.game.update_board(rot_idx, x)
         self.step_count += 1
+        if self.visual is not None:
+            self.visual.place(piece, info, self.game.board)
 
         # episode termination
         self.game.check_game_over()
@@ -134,6 +149,7 @@ class TetrisGym:
         sim.game.rng = random.Random(sim_seed)
         sim.valid_actions = list(self.valid_actions)
         sim.frames = []
+        sim.visual = None
         sim.render_mode = 'skip'
         # The real episode's step budget must not truncate lookahead: a truncated sim reports done
         # without game over and keeps a stale action list, which made beam search step illegal moves.
@@ -165,8 +181,17 @@ class TetrisGym:
         raise AttributeError("Canvas does not support buffer_rgba/tostring_argb")
 
     def render(self, info=None, mode=None):
+        """mode=None draws with matplotlib, "rgb_array" returns that figure as an array, and "pretty"
+        returns the colored PIL renderer's frame (requires enable_visual())."""
+        if mode == "pretty":
+            if self.visual is None:
+                raise RuntimeError("call env.enable_visual() before render(mode='pretty')")
+            from tetris_render import render_env
+
+            return render_env(self, info)
         placement_mask = info.get("placement_mask") if info else None
-        pre_clear_board = info.get("pre_clear_board") if info else None
+        # Show the board with the new piece locked and full rows still present (falls back for old infos).
+        pre_clear_board = (info.get("locked_board", info.get("pre_clear_board"))) if info else None
         if mode == "rgb_array":
             fig = self.game.render(
                 valid_actions=self.valid_actions,
@@ -185,7 +210,7 @@ class TetrisGym:
 
     def capture(self, info=None):
         placement_mask = info.get("placement_mask") if info else None
-        pre_clear_board = info.get("pre_clear_board") if info else None
+        pre_clear_board = (info.get("locked_board", info.get("pre_clear_board"))) if info else None
         fig = self.game.render(
             valid_actions=self.valid_actions,
             placement_mask=placement_mask,

@@ -1,0 +1,25 @@
+{
+  "split": "dev",
+  "split_seeds": [
+    3000,
+    3001,
+    3002,
+    3003
+  ],
+  "pieces": 100,
+  "history_turns_long": 48,
+  "n_short": 160,
+  "n_long": 40,
+  "sample_seed": 7,
+  "generators": [
+    "Kimi-K2.7/direct",
+    "beam",
+    "gemma-4-31B/direct",
+    "gpt-oss-120b/low",
+    "greedy"
+  ],
+  "states_sha256": "76988fd045c765985354a01496afe0ba2a6141c979485d2b91db72fc84e20c1c",
+  "corpus_sha256": "fdfa1d9750ca302824b75cf0f6f8e6b59a8fbcd2cf833ad0560e74c66fcd39d3",
+  "prompt_track": "raw (no simulator annotations), stateless short / append-history long",
+  "oracle": "llm.oracle q_beam (beam_h=2, beam_w=4, content-seeded); approximate, not ground truth"
+}

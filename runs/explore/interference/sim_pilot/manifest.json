@@ -1,0 +1,13 @@
+{
+  "mode": "sim",
+  "live": false,
+  "simulated": true,
+  "mock": false,
+  "config_sha256": "31f78bcd4fdd03d2fe5e02c5c1ab22d4481d6cdcafa95703f2c448f586909ae2",
+  "corpus": "runs/explore/interference/corpus_dev",
+  "corpus_sha256": "fdfa1d9750ca302824b75cf0f6f8e6b59a8fbcd2cf833ad0560e74c66fcd39d3",
+  "started_utc": "2026-10-03T00:52:59Z",
+  "git_commit": "60bddba2ca1e846e5ebb2eac3b66e6c10d5ed22e",
+  "git_dirty_llm_or_configs": true,
+  "ttva_definition": "valid_action_s - arrival_s: scheduled arrival to the first streamed content prefix that parses as a complete JSON object with a legal action_id"
+}

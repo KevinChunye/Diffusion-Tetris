@@ -1,0 +1,9 @@
+model,condition,n_short,n_invalid,fisher_p_vs_short_only,agree_with_fifo
+deepseek-ai/DeepSeek-V4-Flash,defer_long,173,11,0.0200859871321177,0.44508670520231214
+deepseek-ai/DeepSeek-V4-Flash,fifo,173,12,0.011256763030929493,
+deepseek-ai/DeepSeek-V4-Flash,fifo_prio,173,10,0.035348586416049925,0.4913294797687861
+deepseek-ai/DeepSeek-V4-Flash,short_only,173,2,,0.4508670520231214
+google/gemma-4-31B-it,defer_long,173,0,1.0,0.884393063583815
+google/gemma-4-31B-it,fifo,173,0,1.0,
+google/gemma-4-31B-it,fifo_prio,173,0,1.0,0.8786127167630058
+google/gemma-4-31B-it,short_only,173,0,,0.9017341040462428

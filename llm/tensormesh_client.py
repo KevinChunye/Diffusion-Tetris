@@ -94,6 +94,8 @@ class CallResult:
     ttft_token_s: Optional[float] = None
     latency_s: float = 0.0
     end_to_end_s: float = 0.0
+    t0_perf: Optional[float] = None   # perf_counter() at the start of the final attempt
+    content_events: Optional[List[Any]] = None  # [(s since attempt start, content delta)] when requested
     retries: int = 0
     cost_usd: float = 0.0
     prompt_chars: int = 0
@@ -103,6 +105,8 @@ class CallResult:
 
     def to_row(self) -> Dict[str, Any]:
         row = asdict(self)
+        if row["content_events"] is None:
+            row.pop("content_events")
         meta = row.pop("meta") or {}
         row.update({k: v for k, v in meta.items() if k not in row})
         return row
@@ -202,7 +206,10 @@ class TensormeshClient:
         seed: Optional[int] = None,
         extra_body: Optional[Dict[str, Any]] = None,
         meta: Optional[Dict[str, Any]] = None,
+        record_events: bool = False,
     ) -> CallResult:
+        """record_events=True keeps (time, content delta) per SSE chunk so callers can find when the
+        answer first became actionable (e.g. time-to-valid-action)."""
         body: Dict[str, Any] = {"model": model, "messages": messages, "max_tokens": int(max_tokens), "stream": bool(stream)}
         if stream:
             body["stream_options"] = {"include_usage": True}
@@ -228,6 +235,9 @@ class TensormeshClient:
                              prompt_chars=sum(len(m.get("content") or "") for m in messages), retries=attempt)
             res.t_start = time.time()
             t0 = time.perf_counter()
+            res.t0_perf = t0
+            if record_events:
+                res.content_events = []
             status, err = 0, ""
             try:
                 if stream:
@@ -337,6 +347,8 @@ class TensormeshClient:
                         res.ttft_token_s = now
                     if c:
                         text_parts.append(c)
+                        if res.content_events is not None:
+                            res.content_events.append((now, c))
                     if rz:
                         reasoning_parts.append(rz)
                     if choice.get("finish_reason"):

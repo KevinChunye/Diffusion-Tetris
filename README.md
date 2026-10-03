@@ -47,9 +47,28 @@ python -m experiments.pipeline eval   --config configs/eval_run.yaml   --output_
 ## Train, deploy and watch a bot
 
 Every bot (random, greedy heuristic, beam search, CNN-DQN, diffusion-MPC, or an open LLM on
-Tensormesh serverless) plays through one interface in `harness/`. GIFs are rendered with the
-env's own renderer. **The same episode seed means the same piece sequence for every bot**, so
-GIFs and metrics compare bots on identical games.
+Tensormesh serverless) plays through one interface in `harness/`. **The same episode seed means the
+same piece sequence for every bot**, so GIFs and metrics compare bots on identical games.
+
+GIFs use the gym's colored renderer (`tetris_render.py`, opt in with `TetrisGym().enable_visual()` and
+`env.render(info, mode="pretty")`). Each board has:
+- standard tetromino colors;
+- pieces that fall to a landing ghost;
+- full rows that flash before they clear;
+- a NEXT box and score/lines;
+- a GAME OVER overlay.
+
+Comparison GIFs keep every board on the same piece and verify, at every move, that all agents face
+the same current and next piece. Use `--style classic` for the old matplotlib frames.
+
+![Four agents, same game](runs/explore/iter06/four_agents_seed1001_piece30.png)
+
+```bash
+# four agents on one logged game (iteration 6, seed 1001): three LLMs replayed exactly + beam bot live
+python -m harness.compare_gif --steps runs/explore/iter06/steps.csv --seed 1001 --pieces 100 \
+    --arms gemma-4-31B/direct,gpt-oss-20b/low,DeepSeek-V4-Flash/direct --bots beam \
+    --out runs/explore/iter06/four_agents_seed1001.gif
+```
 
 ```bash
 # train (CPU-friendly defaults, wraps the existing trainers)
@@ -84,6 +103,18 @@ validate the harness only; they are not real-model benchmark results.
 `llm/` uses Tetris as a controllable long-horizon workload for serverless open-model inference, with
 dense per-step regret as the quality signal. See `notes/tensormesh_probe.md` (platform probe),
 `notes/exploration_log.md` (iterations), and `notes/exploration_summary.md` (findings).
+
+**Long-context interference study (iteration 8).** Do a tenant's long-context requests delay its short
+decision requests on a hosted endpoint, and does client-side admission help? See
+[`notes/interference_study.md`](notes/interference_study.md) (results, with LIVE and SIMULATED evidence
+kept separate) and [`notes/interference_novelty_matrix.md`](notes/interference_novelty_matrix.md)
+(overlap audit and preregistration).
+
+```bash
+python -m llm.interference_pilot sim  --config configs/interference/pilot_v2.yaml --out <fresh dir>   # SIMULATED
+python -m llm.interference_pilot live --config configs/interference/pilot_v2.yaml --out <fresh dir>   # LIVE, <= $1 est.
+python -m llm.interference_analysis <run dir>                                                         # paired bootstrap
+```
 
 ```bash
 python -m llm.probe_tensormesh --out_dir runs/explore/probe              # Phase 0 probe
