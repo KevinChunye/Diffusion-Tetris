@@ -16,3 +16,4 @@ iteration,label,cost_usd,n_calls,utc
 0,"smoke_tests (live harness, json_schema checks)",0.033991,47,2026-10-02T16:20:00Z
 6,"model_ladder attempt 1 (429-throttled, crashed on relay error; not analyzed)",0.843983,2022,2026-10-02T16:47:00Z
 6,model_ladder,0.857305,1777,2026-10-02T17:14:50Z
+8,interference calibration (calibration),0.008441,8,2026-10-03T00:55:38Z

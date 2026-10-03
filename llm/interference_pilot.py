@@ -30,13 +30,14 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
+import pandas as pd
 import yaml
 
 from llm.admission import Condition, make_policy
 from llm.cache_replay import with_namespace
 from llm.endpoint_sim import EndpointProfile, simulate
 from llm.mixed_workload import load_corpus, make_trace, request_messages
-from llm.run_pilot import record_spend, spent_so_far, TOTAL_BUDGET_USD
+from llm.run_pilot import SPEND_CSV, TOTAL_BUDGET_USD, record_spend, spent_so_far
 from llm.trace_replay import first_valid_time, replay, reserve_usd
 
 DEFAULT_CONFIG = "configs/interference/pilot.yaml"
@@ -127,7 +128,12 @@ def _client(cfg: Dict[str, Any], d: Path):
 
 
 def _cap(cfg: Dict[str, Any]) -> float:
-    return min(float(cfg["budget_usd"]), TOTAL_BUDGET_USD - spent_so_far())
+    """The study budget covers calibration and every live replay of this iteration, not each call."""
+    this_study = 0.0
+    if os.path.exists(SPEND_CSV):
+        ledger = pd.read_csv(SPEND_CSV)
+        this_study = float(ledger.loc[ledger["iteration"].astype(str) == str(cfg["iteration"]), "cost_usd"].sum())
+    return min(float(cfg["budget_usd"]) - this_study, TOTAL_BUDGET_USD - spent_so_far())
 
 
 def run_calibrate(cfg: Dict[str, Any], out: str) -> Path:
