@@ -112,9 +112,9 @@ def main() -> None:
     if args.compare and args.gif and gif_columns:
         print("GIF:", write_gif(side_by_side(gif_columns, ncols=args.ncols), args.gif, fps=args.fps))
     if args.gif and args.style == "pretty":
-        from harness.compare_gif import ACCENTS, build_frames, check_same_pieces, record_agent, save_gif
+        from harness.compare_gif import accent_for, build_frames, check_same_pieces, record_agent, save_gif
 
-        runs = [record_agent(seeds[0], ids, name, ACCENTS[j % len(ACCENTS)]) for j, (name, ids) in enumerate(first_seed)]
+        runs = [record_agent(seeds[0], ids, name, accent_for(name, j)) for j, (name, ids) in enumerate(first_seed)]
         check_same_pieces(runs)
         frames, durations = build_frames(runs, seeds[0], ncols=args.ncols or min(2, len(runs)))
         print("GIF:", save_gif(frames, durations, args.gif))
