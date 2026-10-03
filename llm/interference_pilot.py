@@ -136,7 +136,7 @@ def _cap(cfg: Dict[str, Any]) -> float:
     return min(float(cfg["budget_usd"]) - this_study, TOTAL_BUDGET_USD - spent_so_far())
 
 
-def run_calibrate(cfg: Dict[str, Any], out: str) -> Path:
+def run_calibrate(cfg: Dict[str, Any], out: str, models: List[str] = None) -> Path:
     """Isolated, sequential fresh requests: unloaded latency and real prompt-token counts per kind."""
     d = fresh_run_dir(out, cfg, "calibrate")
     states, entries = load_corpus(cfg["corpus"])
@@ -150,7 +150,8 @@ def run_calibrate(cfg: Dict[str, Any], out: str) -> Path:
     cap, spent = _cap(cfg), 0.0
     try:
         with open(d / "requests.jsonl", "a", encoding="utf-8") as f:
-            for model, mcfg in cfg["models"].items():
+            for model in models or list(cfg["models"]):
+                mcfg = cfg["models"][model]
                 for rid in picks:
                     e = entries[rid]
                     namespace = uuid.uuid4().hex
@@ -178,8 +179,19 @@ def run_calibrate(cfg: Dict[str, Any], out: str) -> Path:
                     f.flush()
                     time.sleep(1.0)
     finally:
-        record_spend(cfg["iteration"], f"interference calibration ({d.name})", spent, len(picks) * len(cfg["models"]))
+        record_spend(cfg["iteration"], f"interference calibration ({d.name})", spent,
+                     len(picks) * len(models or cfg["models"]))
     return d
+
+
+def accounted_spend(d: Path) -> float:
+    """Estimated spend of a run directory from its files alone: recorded request costs, plus the full
+    reservation of every dispatched request that never recorded a row (in flight at a crash/interrupt)."""
+    rows = [json.loads(l) for l in open(d / "requests.jsonl")] if (d / "requests.jsonl").exists() else []
+    dispatched = [json.loads(l) for l in open(d / "dispatch.jsonl")] if (d / "dispatch.jsonl").exists() else []
+    done = {(r.get("run_id"), r["rid"]) for r in rows}
+    unfinished = sum(float(x["reserved_usd"]) for x in dispatched if (x["run_id"], x["rid"]) not in done)
+    return sum(float(r.get("cost_usd") or 0.0) for r in rows) + unfinished
 
 
 def run_live(cfg: Dict[str, Any], out: str, models: List[str] = None, client=None) -> Path:
@@ -219,7 +231,11 @@ def run_live(cfg: Dict[str, Any], out: str, models: List[str] = None, client=Non
                     time.sleep(float(cfg["cooldown_s"]))
                 if stopped:
                     break
+    except BaseException:
+        stopped = "interrupted"
+        raise
     finally:
+        spent = max(spent, accounted_spend(d))
         if not mock:
             record_spend(cfg["iteration"], f"interference live pilot ({d.name})", spent, n_calls)
         (d / "spend.json").write_text(json.dumps({"estimated_cost_usd": spent, "n_calls": n_calls,
@@ -238,7 +254,7 @@ def main() -> None:
     if args.mode == "sim":
         print(run_sim(cfg, args.out))
     elif args.mode == "calibrate":
-        print(run_calibrate(cfg, args.out))
+        print(run_calibrate(cfg, args.out, args.models))
     else:
         print(run_live(cfg, args.out, args.models))
 

@@ -288,3 +288,13 @@ def test_live_runner_and_analysis_end_to_end_with_mock_client(tmp_path):
     assert (pooled["legal_rate"] == 1.0).all()  # the fake always answers a legal id
     with pytest.raises(FileExistsError):
         run_live(cfg, str(d), client=client)
+
+
+def test_interrupted_runs_charge_in_flight_requests_at_their_reservation(tmp_path):
+    from llm.interference_pilot import accounted_spend
+
+    (tmp_path / "requests.jsonl").write_text(json.dumps({"run_id": "a", "rid": "s1", "cost_usd": 0.001}) + "\n")
+    (tmp_path / "dispatch.jsonl").write_text("".join(json.dumps(x) + "\n" for x in (
+        {"run_id": "a", "rid": "s1", "reserved_usd": 0.01}, {"run_id": "a", "rid": "l1", "reserved_usd": 0.02},
+        {"run_id": "b", "rid": "s1", "reserved_usd": 0.01})))
+    assert accounted_spend(tmp_path) == pytest.approx(0.001 + 0.02 + 0.01)

@@ -182,6 +182,9 @@ def replay(trace: Dict, states, entries: Dict[str, Dict], condition: Condition, 
                     waiting.remove(it)
                     inflight[it.rid] = it
                     state["reserved"] += reserve
+                    with open(out / "dispatch.jsonl", "a", encoding="utf-8") as f:  # crash-safe spend accounting
+                        f.write(json.dumps({"run_id": run_id, "rid": it.rid, "kind": it.kind, "admit_s": now,
+                                            "reserved_usd": reserve}) + "\n")
                     threading.Thread(target=worker, args=(it, now, reserve, messages, legal, max_tokens, extra, audit),
                                      daemon=True).start()
             if idx >= len(items) and not waiting and not inflight:

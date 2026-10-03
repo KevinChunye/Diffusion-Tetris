@@ -250,6 +250,26 @@ def verdicts(cmp: pd.DataFrame, acfg: Dict) -> Dict[str, Dict[str, str]]:
     return out
 
 
+def overlap_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Short-request endpoint time-to-first-chunk by how many long requests of the same replay were
+    admitted but had not yet streamed a first chunk (a client-visible proxy for "long prefill in
+    progress") when the short was sent. Observational: conditions differ in how often overlap happens."""
+    out = []
+    for (model, block, cond), g in df.groupby(["model", "block", "condition"]):
+        longs = g[(g["kind"] == "long") & g["admit_s"].notna()]
+        start = longs["admit_s"].to_numpy(float)
+        end = longs["first_chunk_s"].fillna(longs["complete_s"]).to_numpy(float)
+        for _, r in g[(g["kind"] == "short") & g["first_chunk_s"].notna()].iterrows():
+            n = int(((start <= r["admit_s"]) & (r["admit_s"] < end)).sum())
+            out.append({"model": model, "condition": cond, "longs_prefilling": min(n, 2),
+                        "endpoint_first_chunk_s": r["endpoint_first_chunk_s"]})
+    t = pd.DataFrame(out)
+    if t.empty:
+        return t
+    return (t.groupby(["model", "condition", "longs_prefilling"])["endpoint_first_chunk_s"]
+             .agg(n="size", p50="median", p95=lambda x: _q(x, .95)).reset_index())
+
+
 def plot(df: pd.DataFrame, path: Path, title: str) -> None:
     import matplotlib
 
@@ -293,6 +313,7 @@ def analyze(run_dir: str, n_boot: int = None) -> Dict:
     per_block.to_csv(d / "summary_by_block.csv", index=False)
     pooled.to_csv(d / "summary.csv", index=False)
     cmp.to_csv(d / "paired.csv", index=False)
+    overlap_table(df).to_csv(d / "overlap.csv", index=False)
     out = {"evidence": evidence, "run_dir": str(d), "n_bootstrap": n, "verdicts": verdict}
     (d / "verdicts.json").write_text(json.dumps(out, indent=2))
     plot(df, d / "short_ttva_cdf.png", f"{evidence}: short-request TTVA by condition ({d.name})")

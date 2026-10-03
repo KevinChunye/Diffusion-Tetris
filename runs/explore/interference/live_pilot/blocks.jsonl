@@ -1,0 +1,1 @@
+{"block": 0, "trace_seed": 800, "model": "openai/gpt-oss-20b", "order": ["defer_long", "fifo", "fifo_prio", "short_only"], "trace_sha256": "054889bdbdf706fc36b0a0b9abc77a9a73198201984694dea7095959e3ec6dd0", "started_utc": "2026-10-03T00:57:10Z"}
