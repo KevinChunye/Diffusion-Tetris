@@ -1,1 +1,2 @@
 {"block": 0, "trace_seed": 800, "model": "google/gemma-4-31B-it", "order": ["defer_long", "fifo", "fifo_prio", "short_only"], "trace_sha256": "054889bdbdf706fc36b0a0b9abc77a9a73198201984694dea7095959e3ec6dd0", "started_utc": "2026-10-03T01:00:37Z"}
+{"block": 0, "trace_seed": 800, "model": "deepseek-ai/DeepSeek-V4-Flash", "order": ["defer_long", "short_only", "fifo_prio", "fifo"], "trace_sha256": "054889bdbdf706fc36b0a0b9abc77a9a73198201984694dea7095959e3ec6dd0", "started_utc": "2026-10-03T01:03:47Z"}
