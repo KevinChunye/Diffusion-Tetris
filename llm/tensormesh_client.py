@@ -7,9 +7,8 @@ tokens, TTFT, total latency, retries, $ cost (cached tokens at the cached price
 when the price card lists one), plus caller metadata (turn index, arm, seed...).
 
 TTFT definitions (streaming):
-  ttft_s        time from request start to the first SSE data chunk. vLLM emits
-                its first chunk (the role delta) only after prefill has produced
-                the first token, so this is the prefill-dominated latency.
+  ttft_s        time from attempt start to the first SSE data chunk; this may
+                only be a role delta, not an output token or pure prefill time.
   ttft_token_s  time to the first non-empty reasoning/content delta.
 Non-streaming calls cannot measure TTFT but return the per-tier cache split
 (vLLM GPU prefix cache vs LMCache) in `kv_transfer_params`.
@@ -85,12 +84,16 @@ class CallResult:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     cached_tokens: int = 0
+    usage_reported: bool = False
+    cache_usage_reported: bool = False
+    cost_estimate_known: bool = False
     created_cache_tokens: int = 0
     vllm_cached_tokens: Optional[int] = None
     lmcache_cached_tokens: Optional[int] = None
     ttft_s: Optional[float] = None
     ttft_token_s: Optional[float] = None
     latency_s: float = 0.0
+    end_to_end_s: float = 0.0
     retries: int = 0
     cost_usd: float = 0.0
     prompt_chars: int = 0
@@ -215,10 +218,14 @@ class TensormeshClient:
             body.update(extra_body)
 
         meta = dict(meta or {})
-        res = CallResult(model=model, stream=bool(stream), max_tokens=int(max_tokens), meta=meta,
-                         prompt_chars=sum(len(m.get("content") or "") for m in messages))
         attempt = 0
+        request_start = time.perf_counter()
+        wall_start = time.time()
         while True:
+            # A failed stream may already have supplied usage or partial timing.
+            # Never carry those measurements into the next attempt.
+            res = CallResult(model=model, stream=bool(stream), max_tokens=int(max_tokens), meta=meta,
+                             prompt_chars=sum(len(m.get("content") or "") for m in messages), retries=attempt)
             res.t_start = time.time()
             t0 = time.perf_counter()
             status, err = 0, ""
@@ -254,6 +261,11 @@ class TensormeshClient:
             self._log_retry(model, attempt, status, err, sleep_s, meta)
             time.sleep(sleep_s)
 
+        res.end_to_end_s = time.perf_counter() - request_start
+        res.t_start = wall_start
+        price = self.price(model)
+        needs_cache_usage = price.get("cached") is not None and price.get("cached") != price.get("input")
+        res.cost_estimate_known = bool(price) and res.usage_reported and (res.cache_usage_reported or not needs_cache_usage)
         res.cost_usd = call_cost_usd(self.price(model), res.prompt_tokens, res.cached_tokens, res.completion_tokens)
         with self._lock:
             self.total_cost_usd += res.cost_usd
@@ -265,9 +277,11 @@ class TensormeshClient:
     def _read_usage(self, usage: Dict[str, Any] | None, res: CallResult) -> None:
         if not usage:
             return
+        res.usage_reported = "prompt_tokens" in usage and "completion_tokens" in usage
         res.prompt_tokens = int(usage.get("prompt_tokens") or 0)
         res.completion_tokens = int(usage.get("completion_tokens") or 0)
         details = usage.get("prompt_tokens_details") or {}
+        res.cache_usage_reported = "cached_tokens" in details and details["cached_tokens"] is not None
         res.cached_tokens = int(details.get("cached_tokens") or 0)
         res.created_cache_tokens = int(details.get("created_cache_tokens") or 0)
 

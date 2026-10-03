@@ -67,6 +67,9 @@ class MockClient:
                          ttft_s=ttft, ttft_token_s=ttft, latency_s=ttft + 0.001, max_tokens=max_tokens,
                          prompt_chars=sum(len(m["content"]) for m in messages), t_start=time.time(), meta=dict(meta or {}))
         res.cost_usd = call_cost_usd(self.pricing.get(model), res.prompt_tokens, res.cached_tokens, res.completion_tokens)
+        res.usage_reported = res.cache_usage_reported = True
+        res.cost_estimate_known = bool(self.pricing.get(model))
+        res.end_to_end_s = res.latency_s
         with self._lock:
             self.total_cost_usd += res.cost_usd
         if self.log_path:

@@ -14,7 +14,10 @@ Spend is appended to runs/explore/spend.csv; the run stops early at the iteratio
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
+import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +26,7 @@ from typing import Any, Dict, List
 import pandas as pd
 import yaml
 
-from llm.llm_policy import LLMPolicy, PolicyCfg, run_episode
+from llm.llm_policy import LLMPolicy, PolicyCfg, cfg_to_dict, run_episode
 from llm.mock_client import MockClient
 from llm.oracle import compute_regrets
 from llm.tensormesh_client import TensormeshClient, load_model_settings
@@ -61,13 +64,15 @@ def build_arms(cfg: Dict[str, Any]) -> Dict[str, PolicyCfg]:
 
 
 def run(cfg: Dict[str, Any], out_dir: str, mock: bool, workers: int, skip_oracle: bool = False) -> Dict[str, Any]:
+    if any(os.path.exists(os.path.join(out_dir, f)) for f in ("calls.jsonl", "steps.csv", "manifest.json")):
+        raise FileExistsError(f"Choose a fresh output directory; existing results at {out_dir}")
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "config.yaml"), "w", encoding="utf-8") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
     calls_log = os.path.join(out_dir, "calls.jsonl")
     if os.path.exists(calls_log):
         os.remove(calls_log)
-    client = MockClient(log_path=calls_log) if mock else TensormeshClient(log_path=calls_log)
+    client = MockClient(log_path=calls_log) if mock else TensormeshClient(log_path=calls_log, **cfg.get("client", {}))
 
     already = 0.0 if mock else spent_so_far()
     cap = min(float(cfg.get("budget_usd", 5.0)), TOTAL_BUDGET_USD - already)
@@ -76,6 +81,14 @@ def run(cfg: Dict[str, Any], out_dir: str, mock: bool, workers: int, skip_oracle
     print(f"[pilot] spent so far ${already:.3f}; this run capped at ${cap:.3f}")
 
     arms = build_arms(cfg)
+    manifest = {"schema_version": 2, "mock": mock, "latency_definition": "latency_s=final attempt; end_to_end_s=all attempts and backoff",
+                "cost_definition": "price-card estimate for final attempt; retry billing may be unobserved",
+                "resolved_arms": {name: cfg_to_dict(arm) for name, arm in arms.items()},
+                "config_sha256": hashlib.sha256(yaml.safe_dump(cfg, sort_keys=True).encode()).hexdigest(),
+                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                "git_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())}
+    with open(os.path.join(out_dir, "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
     seeds = [int(s) for s in cfg["seeds"]]
     max_pieces = int(cfg["max_pieces"])
     jobs = [(arm, seed) for seed in seeds for arm in arms]
@@ -110,8 +123,11 @@ def run(cfg: Dict[str, Any], out_dir: str, mock: bool, workers: int, skip_oracle
         record_spend(cfg.get("iteration", "?"), cfg.get("name", ""), cost, n_calls)
     print(f"[pilot] {n_calls} calls in {wall:.0f}s, cost ${cost:.4f}")
 
-    steps_df = pd.DataFrame(steps).sort_values(["arm", "episode_seed", "turn"]).reset_index(drop=True)
     eps_df = pd.DataFrame(episodes).sort_values(["arm", "episode_seed"]).reset_index(drop=True)
+    if not steps:
+        eps_df.to_csv(os.path.join(out_dir, "episodes_raw.csv"), index=False)
+        raise RuntimeError("No decisions completed; inspect episodes_raw.csv and calls.jsonl")
+    steps_df = pd.DataFrame(steps).sort_values(["arm", "episode_seed", "turn"]).reset_index(drop=True)
     # Persist the paid-for data before any post-processing.
     steps_df.to_csv(os.path.join(out_dir, "steps_raw.csv"), index=False)
     eps_df.to_csv(os.path.join(out_dir, "episodes_raw.csv"), index=False)
@@ -128,6 +144,11 @@ def run(cfg: Dict[str, Any], out_dir: str, mock: bool, workers: int, skip_oracle
         t1 = time.time()
         steps_df = compute_regrets(steps_df, workers=workers, **okw)
         steps_df["top1_beam"] = (steps_df["rank_beam"] == 1).astype(float)
+        # Executed-action regret includes the fallback policy. Never label it model accuracy.
+        accepted = steps_df["model_action_accepted"]
+        steps_df["model_regret_beam"] = steps_df["regret_beam"].where(accepted)
+        steps_df["model_top1_beam"] = steps_df["top1_beam"].where(accepted)
+        steps_df["model_epsilon_best_beam"] = (steps_df["regret_beam"] <= 1e-9).astype(float).where(accepted)
         print(f"[pilot] oracle on {len(steps_df)} states in {time.time() - t1:.0f}s")
         reg = steps_df.groupby(["arm", "episode_seed"], as_index=False).agg(
             regret_beam=("regret_beam", "mean"), regret_rollout=("regret_rollout", "mean"),
