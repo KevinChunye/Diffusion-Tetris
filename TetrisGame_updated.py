@@ -238,6 +238,8 @@ class TetrisGame:
 
         pre_clear_board = self.board.copy()
         self._lock_piece(piece, (y, x))
+        locked_board = self.board.copy()
+        cleared_rows = np.flatnonzero(np.all(locked_board == 1, axis=1)).tolist()
         self.last_action = f'({rot_idx}, {x})'
         lines_cleared = self._clear_lines()
         self.score += self._compute_score(lines_cleared)
@@ -250,8 +252,10 @@ class TetrisGame:
             "game_over": self.game_over,
             "lines_cleared": lines_cleared,
             "score": self.score,
-            "pre_clear_board": pre_clear_board,  # for rendering, shows the board pre-clear line
-            "placement_mask": placement_mask  # for rendering, shows the last placed block
+            "pre_clear_board": pre_clear_board,  # board before this piece was locked (used by agents' reward shaping)
+            "placement_mask": placement_mask,  # for rendering, shows the last placed block
+            "locked_board": locked_board,  # for rendering: piece locked, full rows not yet cleared
+            "cleared_rows": cleared_rows,  # row indices (in locked_board) removed by this move
         }
         return output_info
 
