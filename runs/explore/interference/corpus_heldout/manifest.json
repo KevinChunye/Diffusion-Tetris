@@ -1,0 +1,22 @@
+{
+  "split": "heldout",
+  "split_seeds": [
+    4000,
+    4001,
+    4002,
+    4003
+  ],
+  "pieces": 100,
+  "history_turns_long": 48,
+  "n_short": 160,
+  "n_long": 40,
+  "sample_seed": 7,
+  "generators": [
+    "beam",
+    "greedy"
+  ],
+  "states_sha256": "cd93f5467f29ec50d4a999f55a948a9b56263106d06ef682b179b159e61b63f9",
+  "corpus_sha256": "24201f7a35e46a05942f85d40392d69b87e3eef00141efccd6b7671e371524a0",
+  "prompt_track": "raw (no simulator annotations), stateless short / append-history long",
+  "oracle": "llm.oracle q_beam (beam_h=2, beam_w=4, content-seeded); approximate, not ground truth"
+}

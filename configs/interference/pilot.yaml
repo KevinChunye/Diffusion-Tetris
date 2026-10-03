@@ -1,0 +1,39 @@
+# Interference pilot (iteration 8). Written before any live data; hypotheses, metrics and margins
+# are preregistered in notes/interference_novelty_matrix.md and restated here so the analysis reads
+# them from one place. Dev corpus only; corpus_heldout is reserved for a later confirmatory run.
+name: interference_pilot
+iteration: 8
+corpus: runs/explore/interference/corpus_dev
+budget_usd: 1.0                 # price-card ESTIMATE across calibration + all live replays (not an invoice)
+client: {max_retries: 0, timeout_s: 60}   # no retries: a failure is a measured outcome
+trace: {duration_s: 40, rate_short: 1.0, rate_long: 0.15, ping_every_s: 2.0}
+blocks: 4                       # per model; a block = one trace replayed under every condition
+block_seed_base: 800            # trace seed of block k = block_seed_base + k (same seed for every model)
+cooldown_s: 8                   # idle gap between consecutive replays
+max_waiting: 200                # client queue bound (backpressure)
+max_wall_s: 150                 # per replay hard stop (trace is 40 s)
+defaults: {temperature: 0, response_format: {type: json_object}}
+models:
+  deepseek-ai/DeepSeek-V4-Flash: {chat_kwargs: {reasoning_effort: null}, max_tokens_short: 64, max_tokens_long: 64}
+  openai/gpt-oss-20b: {chat_kwargs: {reasoning_effort: low}, max_tokens_short: 512, max_tokens_long: 512}
+conditions:
+  short_only: {policy: fifo, concurrency: 8, kinds: [short, ping]}
+  fifo:       {policy: fifo, concurrency: 8}
+  fifo_prio:  {policy: fifo, concurrency: 8, priority_hints: {short: 0, long: 10}}
+  defer_long: {policy: defer_long, concurrency: 8, max_long_inflight: 1, max_defer_s: 6.0}
+analysis:
+  slo_s: 2.5                    # useful decision = strictly valid legal JSON action within slo_s of scheduled arrival
+  h1: {treatment: fifo, control: short_only}
+  h2: {treatment: defer_long, control: fifo, min_p95_reduction: 0.20}
+  b2: {treatment: fifo_prio, control: fifo}
+  noninferiority: {legal_rate_pp: 2.0, regret: 0.15, useful_rate_rel: 0.05}
+  bootstrap: {n: 2000, seed: 0}
+calibration: {n_short: 2, n_long: 2, seed: 5}
+# SIMULATED endpoints, used only to validate the pipeline and to show what each policy does under two
+# regimes. Not fitted to Tensormesh; `bytes_per_token` converts corpus bytes to assumed prompt tokens.
+sim:
+  bytes_per_token: 3.2
+  output_tokens: {short: 12, long: 12}
+  profiles:
+    serialized_prefill: {replicas: 1, step_tokens: 8192, prefill_tok_s: 5000, rtt_s: 0.35}
+    wide_fast:          {replicas: 4, step_tokens: 2048, prefill_tok_s: 40000, rtt_s: 0.35}
