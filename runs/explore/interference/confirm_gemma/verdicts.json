@@ -1,0 +1,12 @@
+{
+  "evidence": "LIVE",
+  "run_dir": "runs/explore/interference/confirm_gemma",
+  "n_bootstrap": 2000,
+  "verdicts": {
+    "google/gemma-4-31B-it": {
+      "H1": "supported: short p95 TTVA +1052% [+689%, +1386%] with long requests mixed in (path-probe p95 shift +0.08 s)",
+      "H2": "supported: short p95 -59% [-66%, -45%]; useful/s noninferior=True, legal-rate noninferior=True, regret noninferior=True",
+      "B2": "priority hints vs fifo: short p95 -2% [-16%, +5%]"
+    }
+  }
+}

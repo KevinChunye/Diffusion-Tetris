@@ -1,0 +1,10 @@
+model,condition,longs_prefilling,n,p50,p95
+deepseek-ai/DeepSeek-V4-Flash,defer_long,0,223,0.6652013909988455,3.048845280000023
+deepseek-ai/DeepSeek-V4-Flash,defer_long,1,188,3.948224201000812,6.362423274000321
+deepseek-ai/DeepSeek-V4-Flash,fifo,0,259,0.6832093100001657,2.5486323869990883
+deepseek-ai/DeepSeek-V4-Flash,fifo,1,112,5.252955361500426,8.64196305599944
+deepseek-ai/DeepSeek-V4-Flash,fifo,2,40,9.063958417500544,15.194537211998977
+deepseek-ai/DeepSeek-V4-Flash,fifo_prio,0,254,0.7278826400006437,2.244853119000254
+deepseek-ai/DeepSeek-V4-Flash,fifo_prio,1,109,4.1954617200008215,9.148468186000173
+deepseek-ai/DeepSeek-V4-Flash,fifo_prio,2,48,9.007041463499263,13.777187362000404
+deepseek-ai/DeepSeek-V4-Flash,short_only,0,411,0.5563694740012579,0.9203877839991037

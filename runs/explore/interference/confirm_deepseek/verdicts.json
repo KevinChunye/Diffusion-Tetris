@@ -1,0 +1,12 @@
+{
+  "evidence": "LIVE",
+  "run_dir": "runs/explore/interference/confirm_deepseek",
+  "n_bootstrap": 2000,
+  "verdicts": {
+    "deepseek-ai/DeepSeek-V4-Flash": {
+      "H1": "supported: short p95 TTVA +1123% [+372%, +inf] with long requests mixed in (path-probe p95 shift +0.19 s)",
+      "H2": "inconclusive: short p95 -46% [-100%, +inf]; useful/s noninferior=False, legal-rate noninferior=True, regret noninferior=True",
+      "B2": "priority hints vs fifo: short p95 +13% [-100%, +inf]"
+    }
+  }
+}

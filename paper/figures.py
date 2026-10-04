@@ -308,30 +308,30 @@ def _arm_color(arm: str) -> str:
 def fig_ladder2() -> None:
     s = pd.read_csv(LADDER_DIR / "summary_scaleup.csv")
     an = json.loads((LADDER_DIR / "analysis.json").read_text())
-    il = json.loads((INTELIF_DIR / "analysis.json").read_text()) if (INTELIF_DIR / "analysis.json").exists() else None
     fig = plt.figure(figsize=(W, 2.7))
-    gs = fig.add_gridspec(1, 2, wspace=0.32)
-    ax, ax2 = fig.add_subplot(gs[0]), fig.add_subplot(gs[1], sharey=None)
+    gs = fig.add_gridspec(1, 2, wspace=0.3)
+    ax, ax2 = fig.add_subplot(gs[0]), fig.add_subplot(gs[1])
     for a in (ax, ax2):
         a.set_xscale("log")
         a.axhline(1.0, color=INK2, lw=0.7, zorder=1)
+        a.set_ylim(-0.03, 1.08)
+    off_a = {"gpt-oss-120b/medium": (0, 11), "GLM-5.2/direct": (-6, 0), "Qwen3.5-397B/direct": (5, -4), "Kimi-K2.7/direct": (5, 3)}
+    off_b = {"gpt-oss-120b/low": (5, 5), "GLM-5.2/direct": (-6, 0), "Kimi-K2.7/direct": (-6, 0), "DeepSeek-V4-Flash/direct": (-6, 0),
+             "Qwen3.5-397B/direct": (5, 4), "Qwen3.8-27B/direct": (5, -4), "gemma-4-31B/direct": (5, 3)}
     for _, r in s.iterrows():
         col = _arm_color(r["arm"])
-        for a, x in ((ax, r["usd_per_100_stated"]), (ax2, r["latency_p50_s"])):
+        for a, x, off in ((ax, r["usd_per_100_stated"], off_a), (ax2, r["total_b"], off_b)):
             a.plot([x, x], [r["norm_score_lo"], r["norm_score_hi"]], color=col, lw=1.2, alpha=0.55, zorder=2)
             _dot(a, x, r["norm_score"], col, size=6)
-        dx, dy = LADDER_OFF.get(r["arm"], (5, 0))
-        ax.annotate(ARM_LABEL[r["arm"]], (r["usd_per_100_stated"], r["norm_score"]), xytext=(dx, dy), textcoords="offset points",
-                    fontsize=6.8, color=INK, ha="left" if dx >= 0 else "right", va="center")
-    if il is not None:
-        ax2.plot([il["latency_p50_s"]], [il["norm_score"]], "D", ms=6, color=INK, mec="white", mew=1.2, zorder=4)
-        if "norm_score_lo" in il:
-            ax2.plot([il["latency_p50_s"]] * 2, [il["norm_score_lo"], il["norm_score_hi"]], color=INK, lw=1.2, alpha=0.55)
-        ax2.annotate("Intelif decision model\n(self-hosted, 4-core CPU)", (il["latency_p50_s"], il["norm_score"]), xytext=(-6, 0),
-                     textcoords="offset points", fontsize=6.8, ha="right", va="center", color=INK)
+            dx, dy = off.get(r["arm"], (5, 0))
+            label = ARM_LABEL[r["arm"]] if a is ax else ARM_LABEL[r["arm"]].replace(", medium", " (medium)")
+            if a is ax2 and r["arm"] == "gpt-oss-120b/medium":
+                continue  # same model and size as gpt-oss-120b (low); labeled once
+            a.annotate(label, (x, r["norm_score"]), xytext=(dx, dy), textcoords="offset points", fontsize=6.8,
+                       color=INK, ha="center" if dx == 0 else ("left" if dx > 0 else "right"), va="center")
     from matplotlib.ticker import NullFormatter
     for a, ticks, fmt in ((ax, [0.005, 0.01, 0.02, 0.05, 0.1, 0.2], lambda t: f"${t:g}"),
-                          (ax2, [0.5, 1, 2, 5, 10, 20, 50], lambda t: f"{t:g}")):
+                          (ax2, [20, 50, 100, 200, 500, 1000], lambda t: f"{t:g}B")):
         lo, hi = a.get_xlim()
         tk = [t for t in ticks if lo <= t <= hi]
         a.set_xticks(tk)
@@ -339,14 +339,16 @@ def fig_ladder2() -> None:
         a.xaxis.set_minor_formatter(NullFormatter())
     ax.set_xlabel("$ per 100 decisions (stated pricing, log)")
     ax.set_ylabel("score relative to beam-search bot")
-    ax.set_title("a  Quality against cost", pad=7)
-    ax2.set_xlabel("median seconds per decision (log)")
-    ax2.set_title("b  Quality against time per move", pad=7)
+    ax.set_title("a  Quality against price", pad=7)
+    ax2.set_xlabel("total parameters (log)")
+    ax2.set_title("b  Quality against size", pad=7)
     sp = an["spearman_vs_score"]
-    ax.text(0.98, 0.03, f"Spearman vs price {sp['price_stated']['rho']:+.2f}", transform=ax.transAxes, ha="right",
-            va="bottom", fontsize=6.8, color=INK2)
+    for a, key in ((ax, "price_stated"), (ax2, "total_params")):
+        a.text(0.03, 0.88, f"Spearman {sp[key]['rho']:+.2f} [{sp[key]['lo']:+.2f}, {sp[key]['hi']:+.2f}]", transform=a.transAxes,
+               ha="left", va="top", fontsize=6.8, color=INK2)
+    ax.text(ax.get_xlim()[0] * 1.05, 1.0, "beam-search bot = 1.0", va="bottom", ha="left", fontsize=6.8, color=INK2)
     _save(fig, "ladder")
-    FACTS["ladder2"] = {"summary": s.round(4).to_dict("records"), "analysis": an, "intelif": il}
+    FACTS["ladder2"] = {"summary": s.round(4).to_dict("records"), "analysis": an}
 
 
 
@@ -417,8 +419,13 @@ def fig_decision() -> None:
     gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.62, 0.8, 0.95], wspace=0.5)
     ax, ax2, ax3 = fig.add_subplot(gs[0]), fig.add_subplot(gs[2]), fig.add_subplot(gs[3])
     # (a) CPU latency against prompt length
-    ax.plot(st["input_tokens"], st["latency_s"], "o", ms=2.2, color=INK, alpha=0.35, mec="none")
-    k = float(np.median(st["latency_s"] / st["input_tokens"]))
+    ax.plot(st["input_tokens"], st["latency_s"], "o", ms=2.0, color=MUTED, alpha=0.5, mec="none")
+    q = pd.read_csv(d / "latency_quiet.csv") if (d / "latency_quiet.csv").exists() else None
+    if q is not None:  # quiet-machine re-timing (the reported latency); in-game points are faint
+        ax.plot(q["input_tokens"], q["latency_s"], "o", ms=3.2, color=INK, mec="white", mew=0.5, zorder=3)
+        k = float(np.median(q["latency_s"] / q["input_tokens"]))
+    else:
+        k = float(np.median(st["latency_s"] / st["input_tokens"]))
     xs = np.array([300, 1400])
     ax.plot(xs, xs * k, color=INK2, lw=0.9)
     ax.text(1400, 1400 * k * 1.12, f"{k * 1000:.0f} ms / token", ha="right", va="bottom", fontsize=6.8, color=INK2)
@@ -470,6 +477,9 @@ def fig_decision() -> None:
         FACTS["decision_calibration"] = g.reset_index(drop=True).round(4).to_dict("records")
     _save(fig, "decision")
     FACTS["decision"] = {"ms_per_token": round(k * 1000, 2), "latency_p50_s": float(st["latency_s"].median()),
+                         "quiet": None if q is None else {"n": int(len(q)), "p50_s": float(q["latency_s"].median()),
+                                                          "same_choice": float(q["same_choice"].mean()),
+                                                          "min_s": float(q["latency_s"].min()), "max_s": float(q["latency_s"].max())},
                          "input_tokens_mean": float(st["input_tokens"].mean()), "decisions": int(len(st)),
                          "episodes": ep.round(4).to_dict("records"), "llm_same_seeds": per.round(4).to_dict(),
                          "gemma_api_latency_p50_s": llm_p50}

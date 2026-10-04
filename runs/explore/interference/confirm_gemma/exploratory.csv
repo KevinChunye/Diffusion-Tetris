@@ -1,0 +1,5 @@
+model,condition,n_short,n_invalid,fisher_p_vs_short_only,agree_with_fifo
+google/gemma-4-31B-it,defer_long,411,0,1.0,0.9099756690997567
+google/gemma-4-31B-it,fifo,411,0,1.0,
+google/gemma-4-31B-it,fifo_prio,411,0,1.0,0.8929440389294404
+google/gemma-4-31B-it,short_only,411,0,,0.8905109489051095

@@ -1,0 +1,5 @@
+model,condition,n_short,n_invalid,fisher_p_vs_short_only,agree_with_fifo
+deepseek-ai/DeepSeek-V4-Flash,defer_long,411,18,0.00034589032021107403,0.4474327628361858
+deepseek-ai/DeepSeek-V4-Flash,fifo,411,17,0.0006381484831542501,
+deepseek-ai/DeepSeek-V4-Flash,fifo_prio,411,20,9.98479094427173e-05,0.5219512195121951
+deepseek-ai/DeepSeek-V4-Flash,short_only,411,2,,0.40487804878048783

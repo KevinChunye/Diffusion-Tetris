@@ -26,3 +26,5 @@ iteration,label,cost_usd,n_calls,utc
 9,capacity_sweep_part3 (capacity_part3),1.130432,186,2026-10-04T07:06:20Z
 11,memory_scaleup,3.61676,4168,2026-10-04T07:25:19Z
 10,ladder_scaleup,3.035036,6403,2026-10-04T08:12:04Z
+12,interference live pilot (confirm_gemma),0.684003,1815,2026-10-04T08:45:53Z
+12,interference live pilot (confirm_deepseek),0.628658,1815,2026-10-04T08:48:48Z
