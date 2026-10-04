@@ -13,7 +13,8 @@ cleared, new holes, stack height change, surface change), plus the next piece.
 Run inside the Python 3.12 environment that has Intelif installed (CPU here, no GPU):
   /home/user/intelif-venv/bin/python -m llm.decision_model --seeds 1000,1001,1002 --pieces 100 \\
       --out runs/explore/scaleup/intelif_seeds1000
-Writes steps.csv in the same schema as LLM game logs (so llm.reference_regret and harness.compare_gif
+Writes calls.jsonl (one raw record per call: every option with its description and probability, latency,
+input tokens), steps.csv in the same schema as LLM game logs (so llm.reference_regret and harness.compare_gif
 work unchanged), episodes.csv and manifest.json.
 """
 
@@ -83,7 +84,7 @@ def question(env: TetrisGym) -> Tuple[Dict, Dict[str, str], str, Dict[str, int]]
     return state, criteria, INSTRUCTIONS.format(piece=piece), ids
 
 
-def play(model, seed: int, pieces: int, arm: str) -> Tuple[List[Dict], Dict]:
+def play(model, seed: int, pieces: int, arm: str, calls_log: Path = None) -> Tuple[List[Dict], Dict]:
     from llm.llm_policy import board_to_str
 
     env = TetrisGym(max_steps=None)
@@ -99,6 +100,15 @@ def play(model, seed: int, pieces: int, arm: str) -> Tuple[List[Dict], Dict]:
         latency = time.perf_counter() - t0
         ans = resp.choices["move"]
         aid = ids[ans.choice]
+        if calls_log is not None:  # raw record of every call: full distribution over options, kept for later analysis
+            probs = {k: float(v) for k, v in ans.probabilities.items()}
+            rec = {"event": "call", "arm": arm, "episode_seed": seed, "turn": turn, "t_start_unix": time.time() - latency,
+                   "latency_s": latency, "input_tokens": int(resp.usage.input_tokens), "choice": ans.choice,
+                   "confidence": float(ans.confidence), "options": {k: {"action_id": ids[k], "description": criteria[k],
+                                                                       "p": probs.get(k)} for k in criteria},
+                   "state": state, "instructions": instr}
+            with open(calls_log, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec) + "\n")
         _, _, done, info = env.step(aid)
         lines += int(info["lines_cleared"])
         rows.append({"arm": arm, "model": "intelif-qwen3-4b@v0.1", "episode_seed": seed, "turn": turn, "board": board_s,
@@ -130,7 +140,7 @@ def main() -> None:
     ap.add_argument("--threads", type=int, default=4)
     args = ap.parse_args()
     out = Path(args.out)
-    if out.exists() and any(out.iterdir()):
+    if any((out / f).exists() for f in ("steps.csv", "calls.jsonl", "manifest.json")):
         raise FileExistsError(f"fresh directory required: {out}")
     out.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(args.threads)
@@ -144,7 +154,7 @@ def main() -> None:
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1))
     eps = []
     for seed in [int(s) for s in args.seeds.split(",")]:
-        rows, ep = play(model, seed, args.pieces, "intelif-qwen3-4b/decision")
+        rows, ep = play(model, seed, args.pieces, "intelif-qwen3-4b/decision", out / "calls.jsonl")
         pd.DataFrame(rows).to_csv(out / "steps.csv", mode="a", header=not (out / "steps.csv").exists(), index=False)
         eps.append(ep)
         pd.DataFrame(eps).to_csv(out / "episodes.csv", index=False)

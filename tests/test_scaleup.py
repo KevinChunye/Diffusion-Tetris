@@ -75,3 +75,31 @@ def test_capacity_sweep_resume_skips_done_rounds_and_adds_extra(tmp_path):
     done = {(r["rep"], r["load"]) for r in first}
     assert all((r["rep"], r["load"]) not in done for r in rounds)
     assert {(r["rep"], r["load"]) for r in rounds} == {(1, 1), (1, 2), (1, 32), (100, 2)}
+
+
+def test_decision_model_plays_legal_moves_and_logs_every_option(tmp_path):
+    """A fake decision model (lowest-hole option wins) plays through the bridge; every call is logged raw."""
+    import json
+    from types import SimpleNamespace
+
+    from llm.decision_model import play
+
+    class Fake:
+        def system_one(self, state, questions):
+            crit = questions["move"]["criteria"]
+            assert "board" in state and "piece" in state
+            score = {k: (0 if "no new holes" in v else -1) + (1 if "clears 1" in v else 0) for k, v in crit.items()}
+            z = sum(2.0 ** s for s in score.values())
+            probs = {k: 2.0 ** s / z for k, s in score.items()}
+            best = max(probs, key=probs.get)
+            ans = SimpleNamespace(choice=best, confidence=probs[best], probabilities=probs)
+            return SimpleNamespace(choices={"move": ans}, usage=SimpleNamespace(input_tokens=123))
+
+    log = tmp_path / "calls.jsonl"
+    rows, ep = play(Fake(), seed=1000, pieces=12, arm="fake/decision", calls_log=log)
+    assert len(rows) == ep["pieces"] == 12
+    assert all(r["used_id"] in json.loads(r["legal_ids"]) for r in rows)
+    recs = [json.loads(l) for l in log.read_text().splitlines()]
+    assert len(recs) == 12
+    assert abs(sum(o["p"] for o in recs[0]["options"].values()) - 1) < 1e-9
+    assert len(recs[0]["options"]) == rows[0]["n_legal"]
