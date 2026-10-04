@@ -108,7 +108,7 @@ ol.refs li { padding-left: 1.2em; text-indent: -1.2em; margin: 0 0 4.5pt; overfl
 /* ---- appendix ---- */
 .appendix-start { break-before: page; }
 pre.cmd {
-  font-family: var(--mono); font-size: 7.4pt; line-height: 1.35; margin: 3pt 0 8pt; padding: 0;
-  white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; hyphens: none; break-inside: avoid;
+  font-family: var(--mono); font-size: 6.3pt; line-height: 1.4; margin: 3pt 0 8pt; padding: 0;
+  white-space: pre; overflow-x: hidden; text-align: left; hyphens: none; break-inside: avoid;
 }
 section.keep { break-inside: avoid; }

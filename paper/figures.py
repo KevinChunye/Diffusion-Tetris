@@ -282,7 +282,7 @@ def fig_decision() -> None:
     it6 = pd.read_csv(RUNS / "iter06" / "episodes.csv")
     it6 = it6[it6["episode_seed"].isin(seeds)]
     fig = plt.figure(figsize=(W, 2.45))
-    gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.62, 0.8, 0.9], wspace=0.62)
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.62, 0.8, 0.9], wspace=0.75)
     ax, ax2, ax3 = fig.add_subplot(gs[0]), fig.add_subplot(gs[2]), fig.add_subplot(gs[3])
     # (a) CPU latency against prompt length
     ax.plot(st["input_tokens"], st["latency_s"], "o", ms=2.0, color=MUTED, alpha=0.5, mec="none")
@@ -294,7 +294,8 @@ def fig_decision() -> None:
         k = float(np.median(st["latency_s"] / st["input_tokens"]))
     xs = np.array([300, 1400])
     ax.plot(xs, xs * k, color=INK2, lw=0.9)
-    ax.text(1400, 1400 * k * 1.12, f"{k * 1000:.0f} ms / token", ha="right", va="bottom", fontsize=6.8, color=INK2)
+    ax.text(0.97, 0.6, f"line: {k * 1000:.0f} ms per token", transform=ax.transAxes, ha="right", va="center",
+            fontsize=6.6, color=INK2)
     ax.axhline(0.04, color=MODEL["gpt-oss-120b"], lw=0.9, ls=(0, (3, 2)))
     ax.text(310, 0.047, "reported, one GPU: ~40 ms", fontsize=6.5, color=INK2, va="bottom")
     llm_p50 = float(pd.read_csv(RUNS / "iter06" / "steps.csv").query("arm == 'gemma-4-31B/direct'")["latency_s"].median())
@@ -341,7 +342,7 @@ def fig_decision() -> None:
         ax3.set_ylim(0, 70)
         ax3.set_yticks([0, 20, 40, 60])
         ax3.set_yticklabels(["0%", "20%", "40%", "60%"])
-        ax3.set_xlabel("median p(chosen), by quartile")
+        ax3.set_xlabel("p(chosen), quartile median")
         ax3.set_ylabel("oracle’s best move chosen")
         ax3.set_title("c  Confidence vs quality", pad=7)
         ax3.grid(axis="x", visible=False)
