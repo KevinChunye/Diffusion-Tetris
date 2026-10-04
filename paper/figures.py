@@ -282,7 +282,7 @@ def fig_decision() -> None:
     it6 = pd.read_csv(RUNS / "iter06" / "episodes.csv")
     it6 = it6[it6["episode_seed"].isin(seeds)]
     fig = plt.figure(figsize=(W, 2.45))
-    gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.62, 0.8, 0.95], wspace=0.5)
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.62, 0.8, 0.9], wspace=0.62)
     ax, ax2, ax3 = fig.add_subplot(gs[0]), fig.add_subplot(gs[2]), fig.add_subplot(gs[3])
     # (a) CPU latency against prompt length
     ax.plot(st["input_tokens"], st["latency_s"], "o", ms=2.0, color=MUTED, alpha=0.5, mec="none")
@@ -325,22 +325,27 @@ def fig_decision() -> None:
     ax2.set_ylim(-0.7, len(rows) - 0.3)
     ax2.set_xlim(-0.03, 1.1)
     ax2.axvline(1.0, color=INK2, lw=0.7)
-    ax2.set_xlabel("score relative to beam search")
+    ax2.set_xlabel("score vs beam bot")
     ax2.set_title(f"b  Same {len(seeds)} games", pad=7)
     ax2.grid(axis="y", visible=False)
     # (c) does the top option's probability track move quality?
     if "regret_beam" in st:
         st["pbin"] = pd.qcut(st["top_prob"], 4, duplicates="drop")
         g = st.groupby("pbin", observed=True).agg(p=("top_prob", "median"), regret=("regret_beam", "mean"),
-                                                   best=("top1_beam", "mean"), n=("turn", "size"))
-        ax3.plot(g["p"], g["regret"], color=INK, lw=1.6)
-        for x, y in zip(g["p"], g["regret"]):
-            _dot(ax3, x, y, INK, size=5)
-        ax3.set_xlabel("probability of the chosen move")
-        ax3.set_ylabel("oracle regret per move")
-        ax3.set_ylim(bottom=0)
+                                                   best=("top1_beam", "mean"), n=("turn", "size")).reset_index(drop=True)
+        ax3.bar(range(len(g)), g["best"] * 100, color=INK, width=0.62)
+        for i, v in enumerate(g["best"] * 100):
+            ax3.text(i, v + 2, f"{v:.0f}%", ha="center", va="bottom", fontsize=6.6, color=INK2)
+        ax3.set_xticks(range(len(g)))
+        ax3.set_xticklabels([f"{x:.2f}" for x in g["p"]], fontsize=6.8)
+        ax3.set_ylim(0, 70)
+        ax3.set_yticks([0, 20, 40, 60])
+        ax3.set_yticklabels(["0%", "20%", "40%", "60%"])
+        ax3.set_xlabel("median p(chosen), by quartile")
+        ax3.set_ylabel("oracle’s best move chosen")
         ax3.set_title("c  Confidence vs quality", pad=7)
-        FACTS["decision_calibration"] = g.reset_index(drop=True).round(4).to_dict("records")
+        ax3.grid(axis="x", visible=False)
+        FACTS["decision_calibration"] = g.round(4).to_dict("records")
     _save(fig, "decision")
     FACTS["decision"] = {"ms_per_token": round(k * 1000, 2), "latency_p50_s": float(st["latency_s"].median()),
                          "quiet": None if q is None else {"n": int(len(q)), "p50_s": float(q["latency_s"].median()),
@@ -473,8 +478,8 @@ def fig_capacity() -> None:
         a.set_xlabel(xlabel)
         a.set_title(title, pad=7)
         rho = r(c["capacity"], c[col])
-        tx = (0.97, "right", 0.05, "bottom") if log else (0.03, "left", 0.95, "top")
-        a.text(tx[0], tx[2], f"Spearman {rho:+.2f}, 9 models", transform=a.transAxes, fontsize=6.8, color=INK2, va=tx[3],
+        tx = (0.03, "left", 0.97, "top") if log else (0.97, "right", 0.30, "center")
+        a.text(tx[0], tx[2], f"Spearman {rho:+.2f}\n9 models", transform=a.transAxes, fontsize=6.8, color=INK2, va=tx[3],
                ha=tx[1])
         if log:
             a.set_xscale("log")

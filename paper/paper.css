@@ -77,7 +77,9 @@ tbody tr:last-child td { border-bottom: 1pt solid var(--rule); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table-wrap { break-inside: avoid; margin: 8pt 0 10pt; }
 
-table.models { font-size: 8.2pt; }
+table.models { font-size: 7.8pt; table-layout: fixed; }
+table.models col.m { width: 19%; } table.models col.p { width: 13%; } table.models col.a { width: 32%; }
+table.models col.k { width: 10%; } table.models col.c { width: 12%; } table.models col.s { width: 14%; }
 table.models td, table.models th { padding: 1.8pt 3pt; }
 table.models tr.sep td { border-top: 0.6pt solid var(--rule); }
 table.models sup { font-size: 6pt; }
