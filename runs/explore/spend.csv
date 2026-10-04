@@ -25,3 +25,4 @@ iteration,label,cost_usd,n_calls,utc
 9,capacity_sweep_part2 (capacity_part2),3.595431,3884,2026-10-04T06:51:11Z
 9,capacity_sweep_part3 (capacity_part3),1.130432,186,2026-10-04T07:06:20Z
 11,memory_scaleup,3.61676,4168,2026-10-04T07:25:19Z
+10,ladder_scaleup,3.035036,6403,2026-10-04T08:12:04Z

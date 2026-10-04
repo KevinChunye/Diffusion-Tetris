@@ -1,0 +1,16 @@
+{
+ "model": "UserMoonlight/intelif-qwen3-4b",
+ "revision": "v0.1",
+ "device": "cpu",
+ "dtype": "fp32compute",
+ "threads": 3,
+ "base_dir": "/home/user/hf/Qwen3-4B",
+ "cpu": "x86_64",
+ "torch": "2.14.1+cpu",
+ "load_s": 61.411509184999886,
+ "git_commit": "abd4fbbdfc3a092aa0ce12c11ecff65bf297da61",
+ "seeds": "1001,1002",
+ "pieces": 100,
+ "stop_after_utc": "",
+ "started_utc": "2026-10-04T07:55:59Z"
+}

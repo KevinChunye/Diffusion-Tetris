@@ -106,3 +106,12 @@ The container has 4 CPU cores and no GPU. The E1/E2 oracle needs about 1.6 CPU-s
   beam-search reference bot itself scored only 10 points, so per-seed ratios explode (an agent scoring 51 gets
   5.1). Score relative to the bot is therefore pooled over seeds, (Σ score − Σ random) / (Σ beam − Σ random), with
   a bootstrap over seeds; the mean of per-seed ratios is kept in the summaries for reference.
+- **E5 latency (07:35 UTC).** The in-game CPU latency of Intelif is inflated by other work on the same 4 cores
+  (E1/E2 clients, the E2 oracle). After all runs, Intelif is re-timed alone on 30 positions sampled uniformly
+  (seed 0) from its own games, same precision and 3 threads; this quiet-machine latency is the one reported
+  as its serving latency, and the in-game latency is reported alongside.
+- **E5 interruption (07:13 UTC).** The Intelif process was killed by the container's out-of-memory killer while
+  we rendered a GIF next to it (Intelif holds ≈9.3 GB). Game 1 (seed 1000) had finished and is kept
+  (`runs/explore/scaleup/intelif`); game 2 had reached piece 22, whose 22 calls remain in that directory's
+  calls.jsonl but are not analyzed. Seeds 1001–1002 were restarted from scratch at 07:54 UTC in
+  `runs/explore/scaleup/intelif_b` with the same settings; nothing memory-heavy runs beside it.

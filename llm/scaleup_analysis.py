@@ -92,7 +92,7 @@ def ladder(run_dir: str) -> dict:
                      "norm_score": _pooled(g), "norm_score_lo": lo, "norm_score_hi": hi,
                      "norm_score_mean_of_ratios": g["norm_score"].mean(),
                      "lines": g["lines_cleared"].mean(), "pieces": g["pieces_placed"].mean(),
-                     "regret_beam": float(np.average(g["regret_beam"], weights=g["decisions"])),
+                     "regret_beam": float(np.average(g["regret_beam"], weights=g["decisions"])) if "regret_beam" in g else np.nan,
                      "usd_per_100_stated": 100 * g["usd_stated"].sum() / dec, "usd_per_100_full": 100 * g["usd_full"].sum() / dec,
                      "latency_p50_s": float(st[st["arm"] == arm]["latency_s"].median()),
                      "total_b": PARAMS_B[model][0], "active_b": PARAMS_B[model][1]})

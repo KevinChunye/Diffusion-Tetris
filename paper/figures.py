@@ -635,6 +635,43 @@ def fig_capacity() -> None:
 
 
 
+# ---- Calls and cost per experiment (Appendix A) -------------------------------------------------------
+
+EXPERIMENTS = {"E1 model ladder": ["scaleup/ladder"], "E2 history policy": ["scaleup/memory"],
+               "E3 cache capacity": ["scaleup/capacity", "scaleup/capacity_part2", "scaleup/capacity_part3"],
+               "E4 interference": ["interference/confirm_gemma", "interference/confirm_deepseek"]}
+
+
+def facts_calls() -> None:
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from llm.tensormesh_client import load_pricing
+
+    pricing = load_pricing(ROOT / "configs" / "pricing.yaml")
+    out = {}
+    for name, dirs in EXPERIMENTS.items():
+        n = failed = 0
+        stated = full = 0.0
+        for d in dirs:
+            f = RUNS / d / "calls.jsonl"
+            if not f.exists():
+                continue
+            for line in open(f, encoding="utf-8"):
+                r = json.loads(line)
+                if r.get("event") != "call":
+                    continue
+                n += 1
+                failed += 0 if r.get("ok") else 1
+                pr = pricing.get(r["model"]) or {}
+                pt, ct, ot = (int(r.get(k) or 0) for k in ("prompt_tokens", "cached_tokens", "completion_tokens"))
+                pin, pout = float(pr.get("input") or 0), float(pr.get("output") or 0)
+                stated += ((pt - ct) * pin + ot * pout) / 1e6
+                full += ((pt if pr.get("cached") is None else pt - ct) * pin + ot * pout) / 1e6
+        out[name] = {"calls": n, "failed": failed, "usd_stated": round(stated, 3), "usd_full": round(full, 3)}
+    FACTS["calls_by_experiment"] = out
+
+
+
 def main() -> None:
     fig_ladder()
     fig_memory()

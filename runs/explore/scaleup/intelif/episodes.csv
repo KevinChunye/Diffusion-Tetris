@@ -1,0 +1,2 @@
+arm,episode_seed,pieces,lines,score,topped_out,latency_p50_s,input_tokens_mean
+intelif-qwen3-4b/decision,1000,65,11,22,True,19.348204355000235,833.1692307692308

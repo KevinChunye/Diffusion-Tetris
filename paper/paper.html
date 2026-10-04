@@ -117,7 +117,17 @@
 
 [[RESULTS_E1]]
 
-[[RESULTS_E2]]
+<h3><span class="num">6.2</span>What history costs, and what it does to play (E2)</h3>
+
+<p>Agents carry memory by resending history. We compared three policies on four models: no history, appending every turn, and keeping the last eight turns. Appending lets the cache do its job: the prompt grows past 10k tokens, yet 90–97% of it is served from cache, so the tokens actually processed per move stay at 500–740 on three models, about the same as with no history at all (620–830; Figure 4a). The eight-turn window is the expensive choice: dropping the oldest turn rewrites the prefix right after the system prompt, so every move re-processes 4.4k–5.2k tokens, 5.7 to 10 times as many as appending (paired over seeds; 95% intervals within about 10%). Qwen3.8 shows the hybrid cost from Section 6.3 in a real game: appending leaves about 1,475 tokens per move uncached, twice the other models, and its 1.15k-token stateless prompt is never cached at all, because it is shorter than one cache block.</p>
+
+<figure id="fig-memory">
+  <img src="figures/memory.svg" alt="Three panels: uncached input tokens per decision, estimated cost per 100 decisions, and oracle regret per decision, for three history policies on four models">
+  <figcaption><strong>Figure 4:</strong> Three history policies on four models, 6–7 paired seeds each (games stopped by the budget guard excluded). (a) Prompt tokens per decision that were not served from cache. (b) Estimated cost under the provider’s stated pricing (cached input free); hollow markers show the upper bound if cached input were billed at the full input price, which matters only for the two models whose cards list no cached price. (c) Oracle regret per decision. 4,168 calls.</figcaption>
+</figure>
+
+<p>Who pays for the cache decides whether appending is cheap. Under the provider’s stated policy, appending costs 0.89 to 1.27 times as much as no history on every model. If cached input were billed at the full price, as two of the four model cards would literally suggest, appending would cost 11 times as much on DeepSeek-V4-Flash (95% CI 9.5–12.6) and 12 times on Qwen3.8 (8.9–15.2), while staying at 0.9–1.0 on the gpt-oss models. An agent’s cheapest memory policy therefore hinges on a line of the price card that model comparisons rarely mention. Quality points the other way. The board is fully visible, so history adds no information, and appending made every model play worse: relative to the beam-search bot, gpt-oss-20b fell from 0.40 to 0.03, gpt-oss-120b from 0.60 to 0.24, Qwen3.8 from 0.39 to 0.13 and DeepSeek from 0.20 to 0.11 [[E2_REGRET]]. The memory that is cheapest to serve is the one that plays worst, consistent with earlier evidence that long, repetitive context degrades use of the relevant part <a href="#ref-lost">(Liu et al., 2024a)</a>.</p>
+
 
 <h3><span class="num">6.3</span>How many agents a deployment keeps warm (E3)</h3>
 
@@ -136,7 +146,11 @@
 
 <h2><span class="num">7</span>Discussion</h2>
 
-<p>[[DISCUSSION]]</p>
+<p><strong>What the weights predict, and what they do not.</strong> Published architecture predicted two things an agent can see from outside: how long a cold prompt takes (active parameters) and how much of a repeated prompt a hybrid model can reuse (block-aligned caching of recurrent state). It did not predict the outcome that matters most for an agent fleet, how many agents a deployment keeps warm, which followed the hardware behind the deployment rather than the compactness of the model’s KV cache. [[DISC_LADDER]] A leaderboard row reports none of these.</p>
+
+<p><strong>What to report.</strong> An evaluation of an agent on a served model should state the provider and model identifier, the date, the full price card including cached input and how it was applied, the cache behavior the API reports (granularity and hit rate at the agent’s concurrency), refusals under load, the agent’s memory and admission policy, and, for self-hosted models, the hardware and numeric precision. Each of these changed an outcome in our measurements by a factor of two or more. The cost of measuring them is small: the four API experiments cost [[TOTAL_STATED]] under the provider’s stated pricing ([[TOTAL_FULL]] at the full-price upper bound), and every figure regenerates from the raw logs.</p>
+
+<p><strong>Decision models.</strong> A decision model removes generation, parsing and invalid outputs from the loop: Intelif always returned a legal move with a probability for every option. [[DISC_DECISION]]</p>
 
 <h2><span class="num">8</span>Limitations</h2>
 
