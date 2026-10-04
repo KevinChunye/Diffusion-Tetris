@@ -1,0 +1,25 @@
+# E3 (iteration 9): cache capacity under concurrency, all nine catalog models. Written before data.
+# N agents start together; each warms a unique ~6.6k-token Tetris history, idles 30 s, then probes it.
+# Hit = reported cached_tokens >= 50% of the warm prompt; latency is logged for models that do not report hits.
+iteration: 9
+name: capacity_sweep
+history_turns: 8
+gap_s: 30
+cooldown_s: 15
+loads: [1, 2, 4, 8, 16, 32, 64]
+parallel_lanes: 3
+max_inflight: 200
+lane_stagger_s: 5
+timeout_s: 180
+seed: 9
+budget_usd: 5.0
+models:                                    # reps scaled inversely to input price
+  - {id: openai/gpt-oss-20b, reps: 5}
+  - {id: deepseek-ai/DeepSeek-V4-Flash, reps: 4}
+  - {id: openai/gpt-oss-120b, reps: 3}
+  - {id: google/gemma-4-31B-it, reps: 3}
+  - {id: MiniMaxAI/MiniMax-M2.5, reps: 2}
+  - {id: Qwen/Qwen3.8-27B-FP8, reps: 1}
+  - {id: moonshotai/Kimi-K2.7-Code, reps: 1}
+  - {id: Qwen/Qwen3.5-397B-A17B-FP8, reps: 1, max_load: 32}
+  - {id: lukealonso/GLM-5.2-NVFP4, reps: 1, max_load: 16}

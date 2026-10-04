@@ -34,7 +34,7 @@ from llm.tetris_tools import normalized_scores, reference_table
 
 EXPLORE_DIR = "runs/explore"
 SPEND_CSV = os.path.join(EXPLORE_DIR, "spend.csv")
-TOTAL_BUDGET_USD = 25.0
+TOTAL_BUDGET_USD = 20.0  # whole research program (user-set budget, 2026-10-04)
 
 
 def spent_so_far() -> float:
