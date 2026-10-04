@@ -3,230 +3,229 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Not Just the Weights</title>
+<title>Evaluating Agents as Served</title>
 <link rel="stylesheet" href="paper.css">
 </head>
 <body>
 
-<header class="title">
-  <h1>Not Just the Weights: What Tetris Reveals About Serving Open-Weight Agents</h1>
-  <p class="subtitle">How price cards, caches and an agent’s own traffic shape the cost, latency and quality it actually gets</p>
-  <p class="meta">Draft, October 2026 · Diffusion-Tetris project · code, frozen workloads and every run: github.com/KevinChunye/Diffusion-Tetris</p>
-</header>
+<div class="title-block">
+  <h1 class="title">Evaluating Agents as Served, Not as Weights</h1>
+  <div class="author">
+    <span class="name">Haochuan Wang</span><br>
+    Massachusetts Institute of Technology<br>
+    <span class="email">hcw@mit.edu</span>
+  </div>
+</div>
 
-<section class="abstract">
-  <h2>Abstract</h2>
-  <p>Open-weight models are compared on leaderboards that score the weights. An agent never meets the weights alone. It meets a deployment with a price card, a cache and other traffic, and it brings its own habits about what context to send and when. We ask how much of what an agent actually gets, in decision quality, latency and cost, is decided outside the weights. Tetris is our measuring instrument: every move can be scored against an oracle, every game replays exactly, and every agent can be given the same pieces. Running nine open-weight models on a serverless provider, we find that factors outside the weights are as large as the differences between models. The same memory policy is the cheapest option on one model and ten times more expensive on another, because of one line of the price card. One deployment keeps all sixteen of our concurrent agent contexts in cache, another keeps one. A tenant’s own long-context requests raise the 95th-percentile time to a valid move from 0.9 s to 15.4 s, and a simple admission rule cuts that by 69% at equal cost. Price and size do not predict decision quality. We argue that evaluations of open-weight models should report the serving context they were measured in, and we release the harness, workloads and data.</p>
-</section>
+<p class="abstract-head">Abstract</p>
+<div class="abstract">
+<p>[[ABSTRACT]]</p>
+</div>
 
 <figure class="teaser">
-  <img src="figures/teaser.png" alt="Four Tetris boards side by side, the same game at piece 60">
-  <figcaption><span class="label">Figure 1.</span>Same game, same pieces, four agents (seed 1001, piece 60 of 100). Three open-weight models replayed from their logged games on Tensormesh, next to a classic beam-search bot. DeepSeek-V4-Flash has already topped out; gemma-4-31B goes on to finish all 100 pieces with the highest score (124 points). Animated versions of all three seeds are in runs/explore/iter06/.</figcaption>
+  <img src="figures/teaser.png" alt="[[TEASER ALT]]">
+  <figcaption>[[TEASER CAPTION]]</figcaption>
 </figure>
 
 <h2><span class="num">1</span>Introduction</h2>
 
-<p>An agent built on an open-weight model rarely runs that model itself. It calls an endpoint. Behind the endpoint sit an inference engine, a cache, a scheduler, a routing layer and a price list, all shared with other tenants. The agent adds its own choices on top: how much history to resend, how many requests to keep in flight, and whether long and short requests share the same queue. What the agent receives, a decision of some quality at some latency for some price, is the product of all of these.</p>
+<p>An agent built on a language model rarely runs the model itself. It calls an endpoint, and behind the endpoint sit an inference engine, a cache, a scheduler and a price list, all shared with other tenants. The agent adds its own habits: how much history it resends, how many requests it keeps in flight, and whether long and short requests share a queue. What the agent receives, a decision of some quality at some latency and price, comes from all of these together.</p>
 
-<p>Evaluation has not caught up with this. Leaderboards and agent benchmarks rank the weights by task quality and treat everything below them as fixed. Serving systems make engines fast and cheap, but they are evaluated on servers their authors control, with synthetic traffic and with quality held constant by construction. That leaves an elephant in the room for open weights in particular: the thing being ranked is not the thing being used. The same checkpoint can be served by many providers, quantized differently, cached differently and priced differently. Recent audits show that providers share prompt caches across users <a href="#ref-gu">(Gu et al., 2025)</a>, that a provider could substitute a different model without detection <a href="#ref-cai">(Cai et al., 2025)</a>, and that vendors of one open model differ in tool-call accuracy <a href="#ref-k2">(MoonshotAI, K2-Vendor-Verifier)</a>. None of this shows up in a leaderboard row.</p>
+<p>Evaluations mostly rank the weights. Agent and game benchmarks report task quality through an API and treat serving as fixed; serving systems are evaluated on servers their authors control, with quality held constant. For open-weight models the gap is sharpest: one checkpoint can be served by many providers, quantized, cached and priced differently. A newer kind of model widens it. Decision models such as TypeSafe’s Jev and the open Intelif do not generate text; they score a caller’s options in one forward pass <a href="#ref-jev">(Crabtree, 2026</a>; <a href="#ref-intelif">Krishnan, 2026)</a>. Their appeal is speed, and speed is a property of where a model runs.</p>
 
-<p>This paper measures how large those effects are for an agent, from the only place an agent can stand: the client side of a black-box endpoint. We use Tetris as the instrument. It is a classic hard control problem <a href="#ref-demaine">(Demaine et al., 2003)</a> with a long history in machine learning <a href="#ref-algorta">(Algorta and Şimşek, 2017)</a> and in game benchmarks for language models <a href="#ref-lmgame">(Hu et al., 2026)</a>. Three properties make it useful here. Every move can be scored against an oracle, which gives a dense quality signal rather than one number per episode. Every game replays exactly, so a run can be audited move by move. Every agent can be given the same piece sequence, so differences between agents are differences in play, not luck. A game is also long, so an agent’s context grows the way real agent contexts do.</p>
+<p>We measure what agents get from models as served, from the only place an agent stands: the client side. Tetris is the instrument <a href="#ref-algorta">(Algorta and Şimşek, 2017)</a>. Every move can be scored against an oracle, every game replays exactly, and every agent can be given the same pieces. We ran [[N_CALLS]] calls to nine open-weight models on one serverless provider, Tensormesh, and self-hosted Intelif on a 4-core CPU.</p>
 
-<div class="findings">
-  <h4>What we found</h4>
-  <ol>
-    <li><span class="emoji">💸</span><span>The same agent memory is the cheapest choice on one model and ten times more expensive on another, because one provider bills cache hits and another does not.</span></li>
-    <li><span class="emoji">🧊</span><span>Caching works on every model we tested, but one deployment keeps all 16 of our concurrent agent contexts warm and another keeps one.</span></li>
-    <li><span class="emoji">⏱️</span><span>An agent’s own long requests raise the tail latency of its short decisions from 0.9 s to 15.4 s; deferring them cuts that by 69% at the same cost.</span></li>
-    <li><span class="emoji">🎮</span><span>A 31B model answering directly reaches 88% of a search bot’s score for $0.01 per 100 moves; the most expensive model reaches 35% at 15 times the price.</span></li>
-  </ol>
-</div>
-
-<p>We make three contributions.</p>
-<ul class="contrib">
-  <li>A framing of agent evaluation at the tenant boundary of the serving stack (Section 2): what an agent controls, what it can observe, and which outcomes it pays for.</li>
-  <li>Four measurements on nine open-weight models served by Tensormesh, linking price cards, cache behavior and the agent’s own traffic to cost, latency and decision quality (Section 5). Total spend was under $6.</li>
-  <li>An open, replayable harness: a Tetris environment whose piece sequence depends only on the seed, a frozen and hash-verified request corpus, an open-loop load replayer, and same-game visual comparisons of agents.</li>
+<ul class="findings">
+  <li><span class="emoji">🎮</span><span>[[FINDING_LADDER]]</span></li>
+  <li><span class="emoji">🧊</span><span>[[FINDING_CAPACITY]]</span></li>
+  <li><span class="emoji">⏱️</span><span>[[FINDING_INTERFERENCE]]</span></li>
+  <li><span class="emoji">🎯</span><span>[[FINDING_DECISION]]</span></li>
 </ul>
 
-<h2><span class="num">2</span>Where this work sits in the stack</h2>
+<p>Our contributions are (i) a measurement design that separates what an agent controls, observes and cannot see (Section 2); (ii) five preregistered experiments, each with more than 5,000 calls or every decision of a self-hosted model, linking deployment properties to cost, latency and decision quality, read against each model’s published architecture (Sections 4–5); and (iii) an open, replayable harness with raw logs of every call.</p>
 
-<p>Figure 2 splits the stack an agent depends on into five layers and marks what each line of prior work studies. Agent and game benchmarks measure the top layer and use it to rank the bottom one. Serving systems work on the engine. API audits check that the provider layer is honest. This paper works across the top three layers, from the tenant’s side. We vary what the agent controls (its memory and its traffic), observe what the provider exposes (latency, reported cache hits, the price card, errors) and score what the agent gets (decisions, cost, time). We never see inside the engine, so anything we say about engine mechanisms is a hypothesis consistent with the data, not a measurement.</p>
+<h2><span class="num">2</span>What an agent can see</h2>
 
-<figure id="fig-stack">
-  <table class="stack">
-    <colgroup><col class="layer"><col><col><col><col></colgroup>
+<p>Figure 2 lists the layers between a Tetris agent and the weights, what our agent varies at each layer, what it can observe, and what stays hidden. We vary only the top two layers and the choice of model. Everything we say about the engine is inferred from timing and reported token counts, so we state it as a hypothesis consistent with the data, not as a measurement.</p>
+
+<figure id="fig-setup">
+  <table class="setup">
+    <colgroup><col class="layer"><col><col><col></colgroup>
     <thead>
-      <tr>
-        <th class="layer-h">Layer an agent depends on</th>
-        <th>Agent and game benchmarks</th>
-        <th>Serving systems</th>
-        <th>API audits</th>
-        <th class="ours">This paper</th>
-      </tr>
+      <tr><th>Layer</th><th>What the agent varies (experiment)</th><th>What it observes</th><th>What stays hidden</th></tr>
     </thead>
     <tbody>
-      <tr><td class="layer"><span class="emoji">🎮</span><span class="name">Task</span><span class="sub">decisions and their quality</span></td><td><span class="dot f"></span></td><td></td><td><span class="dot h"></span></td><td class="ours"><span class="dot f"></span></td></tr>
-      <tr><td class="layer"><span class="emoji">🧭</span><span class="name">Agent harness</span><span class="sub">memory, concurrency, request timing</span></td><td><span class="dot o"></span></td><td><span class="dot h"></span></td><td></td><td class="ours"><span class="dot f"></span></td></tr>
-      <tr><td class="layer"><span class="emoji">🌐</span><span class="name">Serverless API</span><span class="sub">price card, cache reporting, rate limits</span></td><td><span class="dot o"></span></td><td></td><td><span class="dot f"></span></td><td class="ours"><span class="dot f"></span></td></tr>
-      <tr><td class="layer"><span class="emoji">⚙️</span><span class="name">Inference engine</span><span class="sub">batching, prefill scheduling, KV cache</span></td><td></td><td><span class="dot f"></span></td><td><span class="dot h"></span></td><td class="ours"><span class="dot o"></span></td></tr>
-      <tr><td class="layer"><span class="emoji">🧠</span><span class="name">Open weights</span><span class="sub">the checkpoint a leaderboard ranks</span></td><td><span class="dot f"></span></td><td><span class="dot o"></span></td><td><span class="dot f"></span></td><td class="ours"><span class="dot f"></span></td></tr>
+      <tr><td class="layer"><span class="emoji">🎮</span>Task: Tetris</td><td>nothing: every agent gets the same seeded pieces</td><td>board, current and next piece, legal placements; oracle regret per move</td><td>nothing (fully observed)</td></tr>
+      <tr><td class="layer"><span class="emoji">🧭</span>Agent harness</td><td>model <span class="exp">E1</span>, history sent <span class="exp">E2</span>, concurrent agents <span class="exp">E3</span>, request mix and admission <span class="exp">E4</span></td><td>its own queue and timing</td><td>nothing (we wrote it)</td></tr>
+      <tr><td class="layer"><span class="emoji">🌐</span>Serverless API</td><td>output limits, JSON schema, priority hints <span class="exp">E4</span></td><td>latency, reported prompt, cached and output tokens, refusals (HTTP 429), the public price card</td><td>billing (the API key cannot read it), routing, replica count, other tenants</td></tr>
+      <tr><td class="layer"><span class="emoji">⚙️</span>Inference engine</td><td>nothing</td><td>only indirectly: cache hits, prefill throughput</td><td>batching, scheduler, KV memory pool, eviction and offloading</td></tr>
+      <tr><td class="layer"><span class="emoji">🧠</span>Weights</td><td>which served model id <span class="exp">E1–E4</span></td><td>model card and config: parameters, attention and KV design</td><td>the exact checkpoint and quantization behind an id</td></tr>
+      <tr><td class="layer"><span class="emoji">🎯</span>Self-hosted decision model</td><td>hardware, precision, threads <span class="exp">E5</span></td><td>everything: probability of every option, exact compute time</td><td>nothing; Jev itself is API-only and not tested</td></tr>
     </tbody>
   </table>
-  <p class="stack-key"><span><span class="dot f"></span>measured or varied</span><span><span class="dot h"></span>partly</span><span><span class="dot o"></span>present but held fixed</span><span>blank: not studied</span></p>
-  <figcaption><span class="label">Figure 2.</span>The serving stack seen by an agent, and what each line of work studies. Agent and game benchmarks: AgentBench, BALROG, lmgame-Bench, HELM. Serving systems: Orca, vLLM, Sarathi-Serve, DistServe, SGLang and their successors. API audits: prompt-cache timing audits, model-substitution audits, vendor verifiers. References in Section 3.</figcaption>
+  <figcaption><strong>Figure 2:</strong> The measurement setup, layer by layer. E1–E4 call Tensormesh’s serverless API (vLLM with LMCache); E5 runs Intelif in our own container. Engine internals are never observed directly.</figcaption>
 </figure>
 
-<h2><span class="num">3</span>Related work and existing benchmarks</h2>
+<h2><span class="num">3</span>Related work</h2>
 
-<p><strong>Serving systems make the engine efficient.</strong> Continuous batching <a href="#ref-orca">(Yu et al., 2022)</a> and paged KV memory in vLLM <a href="#ref-vllm">(Kwon et al., 2023)</a> set the baseline for modern engines. Chunked prefill with stall-free batching <a href="#ref-sarathi">(Agrawal et al., 2024)</a> and prefill/decode disaggregation <a href="#ref-distserve">(Zhong et al., 2024</a>; <a href="#ref-splitwise">Patel et al., 2024)</a> attack interference between long prompts and ongoing generation. Schedulers add preemption, migration, SLO awareness and online/offline co-location <a href="#ref-fastserve">(Wu et al., 2023</a>; <a href="#ref-llumnix">Sun et al., 2024</a>; <a href="#ref-slos">Chen et al., 2025</a>; <a href="#ref-hygen">Sun et al., 2025)</a>. A second line reuses KV cache across requests: RadixAttention in SGLang <a href="#ref-sglang">(Zheng et al., 2024)</a>, prompt-aware placement <a href="#ref-preble">(Srivatsa et al., 2025)</a>, multi-turn caching <a href="#ref-cachedattn">(Gao et al., 2024)</a>, KV-centric architectures <a href="#ref-mooncake">(Qin et al., 2025)</a> and cache layers such as LMCache <a href="#ref-lmcache">(Liu et al., 2025)</a> and CacheBlend <a href="#ref-cacheblend">(Yao et al., 2025)</a>. Agent-aware engines schedule whole programs rather than single calls <a href="#ref-autellix">(Luo et al., 2025</a>; <a href="#ref-agentservesim">Rajib et al., 2026)</a>. All of this work assumes control of the server. Our endpoint runs vLLM with LMCache, judging by the hit counts its responses report, so these mechanisms are present, but a tenant can neither configure nor observe them. We ask what survives of them at the tenant boundary.</p>
+<p><strong>Serving systems.</strong> Continuous batching <a href="#ref-orca">(Yu et al., 2022)</a>, paged KV memory in vLLM <a href="#ref-vllm">(Kwon et al., 2023)</a>, chunked prefill <a href="#ref-sarathi">(Agrawal et al., 2024)</a> and prefill/decode disaggregation <a href="#ref-distserve">(Zhong et al., 2024</a>; <a href="#ref-splitwise">Patel et al., 2024)</a> make engines fast; KV reuse across requests is handled by RadixAttention <a href="#ref-sglang">(Zheng et al., 2024)</a>, multi-turn caching <a href="#ref-cachedattn">(Gao et al., 2024)</a>, KV-centric designs <a href="#ref-mooncake">(Qin et al., 2025)</a> and cache layers such as LMCache <a href="#ref-lmcache">(Liu et al., 2025)</a>. Agent-aware engines schedule whole programs <a href="#ref-autellix">(Luo et al., 2025)</a>. This work assumes control of the server; we ask what of it reaches a tenant. Client-side scheduling for black-box APIs has been studied in simulation <a href="#ref-yuan">(Yuan et al., 2026)</a>; we test its simplest form on a live endpoint, using open-loop load <a href="#ref-schroeder">(Schroeder et al., 2006)</a> and tail metrics <a href="#ref-tail">(Dean and Barroso, 2013)</a>.</p>
 
-<p><strong>Client-side scheduling is known, but untested on real prefill.</strong> Scheduling in front of a black-box API has been proposed with fair queuing, feasibility ordering and admit/defer/reject control <a href="#ref-yuan">(Yuan et al., 2026)</a>. That study evaluates in simulation, with a mock provider whose delay grows with predicted token work and concurrent load. We test the simplest member of this family on a real endpoint whose delay is dominated by prefill of long inputs. Two classic measurement lessons shape our load experiments: open-loop arrivals avoid the optimism of closed-loop load generators <a href="#ref-schroeder">(Schroeder et al., 2006)</a>, and tail latency, not the mean, decides how responsive a system feels <a href="#ref-tail">(Dean and Barroso, 2013)</a>.</p>
+<p><strong>Benchmarks and audits.</strong> AgentBench <a href="#ref-agentbench">(Liu et al., 2024b)</a>, BALROG <a href="#ref-balrog">(Paglieri et al., 2025)</a> and lmgame-Bench <a href="#ref-lmgame">(Hu et al., 2026)</a>, which includes Tetris, score decisions through an API; HELM <a href="#ref-helm">(Liang et al., 2023)</a> adds efficiency metrics, and MLPerf Inference <a href="#ref-mlperf">(Reddi et al., 2020)</a> measures serving stacks at fixed accuracy. Audits show deployments differ: prompt caches shared across users <a href="#ref-gu">(Gu et al., 2025)</a>, undetectable model substitution <a href="#ref-cai">(Cai et al., 2025)</a>, and vendor differences for one open model <a href="#ref-k2">(MoonshotAI, K2-Vendor-Verifier)</a>. We measure what such differences cost an agent.</p>
 
-<p><strong>Benchmarks rank the weights.</strong> Agent benchmarks such as AgentBench <a href="#ref-agentbench">(Liu et al., 2024b)</a>, BALROG <a href="#ref-balrog">(Paglieri et al., 2025)</a> and lmgame-Bench <a href="#ref-lmgame">(Hu et al., 2026)</a>, which includes Tetris, measure decision quality through an API and treat serving as fixed. HELM <a href="#ref-helm">(Liang et al., 2023)</a> adds efficiency to its metrics, and Chatbot Arena <a href="#ref-arena">(Chiang et al., 2024)</a> ranks models by human preference. On the systems side, MLPerf Inference <a href="#ref-mlperf">(Reddi et al., 2020)</a> fixes accuracy targets and measures hardware and software stacks under controlled load. None of these connects a deployment’s price card, cache and contention to the decisions an agent makes. Our results show that this connection can reorder which configuration is best.</p>
+<p><strong>Decision models.</strong> TypeSafe calls models that return calibrated probabilities over a caller’s options, rather than text, “System One” models. Its Jev is hosted only, in early access behind a waitlist, and is described by its makers as “neither small nor an LLM”, with end-to-end responses of 70–500 ms <a href="#ref-typesafe">(Almeida, 2026</a>; <a href="#ref-jev">Crabtree, 2026)</a>; TypeSafe does not publish results on public benchmarks. Intelif is an open alternative that accepts the same request format: Qwen3-4B <a href="#ref-qwen3">(Yang et al., 2025)</a> with a LoRA adapter <a href="#ref-lora">(Hu et al., 2021)</a> and a linear scorer that reads one anchor token per option, so a single forward pass scores every option <a href="#ref-intelif">(Krishnan, 2026)</a>. Its authors report 31.77 on the third-party Decision Index <a href="#ref-dindex">(apolinario, 2026)</a> at a median of 16.5 ms on one RTX PRO 6000 GPU, and about 40 ms per Tetris move. We could not access Jev, so we test Intelif, and we test it where an agent without a GPU would run it.</p>
 
-<p><strong>Audits show the deployment matters.</strong> Timing audits found prompt caches shared across users at several providers <a href="#ref-gu">(Gu et al., 2025)</a>. Model-substitution audits show that output tests alone cannot verify which model a provider serves <a href="#ref-cai">(Cai et al., 2025)</a>, and a vendor verifier for one open model compares tool-call behavior across providers <a href="#ref-k2">(MoonshotAI, K2-Vendor-Verifier)</a>. We take the next step and measure what deployment differences cost an agent. Two further threads frame our results: long, repetitive contexts can hurt model accuracy <a href="#ref-lost">(Liu et al., 2024a)</a>, and open weights are valued because anyone can run and adapt them <a href="#ref-kapoor">(Kapoor et al., 2024)</a>, which is also why the serving context around them varies.</p>
+<h2><span class="num">4</span>Models, and what their architecture predicts</h2>
 
-<h2><span class="num">4</span>How we measured</h2>
+<p>The provider serves nine open-weight models (Table 1). If the weights alone decided what an agent experiences, two published quantities should matter most. The first is the KV cache one agent context occupies, which bounds how many contexts a given memory can keep; across these models it differs by a factor of 64. The second is the number of active parameters, which sets the compute to read a prompt, about two FLOPs per active parameter per token plus attention; it differs by a factor of 11.</p>
 
-<p>All experiments call Tensormesh’s public serverless endpoint, an OpenAI-compatible API serving nine open-weight models, including the gpt-oss family <a href="#ref-gptoss">(OpenAI, 2025)</a>, gemma-4, DeepSeek-V4-Flash, Qwen, Kimi, GLM and MiniMax. Model identifiers are the provider’s; we cannot verify the exact checkpoint or quantization behind them. Each move, the agent receives the board, the current and next piece and the list of legal placements, and answers with a JSON object naming one placement. In the game experiments (Sections 5.1 and 5.2) each legal placement is also annotated with its simulated outcome (lines cleared, height, holes); the interference experiment (Section 5.4) uses the raw board without annotations. The environment is a 10×20 board with one piece of preview and a uniform random piece generator. We fixed it so that the piece sequence depends only on the episode seed, never on how much an agent simulates, which is what lets different agents face identical games.</p>
+<div class="table-wrap">
+  <p class="table-caption"><strong>Table 1:</strong> The ten models. Parameters and attention design are from each model’s report, card or config. KV / context is our estimate of the 16-bit KV cache (plus fixed recurrent state for Gated DeltaNet layers) that one 5.5k-token agent context (as in E3) needs, computed from the published config; real engines may store less (e.g., FP8). Prices are the provider’s list prices per million input and output tokens; the provider states that cached input is free on every model. <sup>a</sup>Active parameters from the MiniMax-M2 card (same architecture). <sup>b</sup>Not on the price page; the page lists the previous version (Qwen3.6-27B, Kimi K2.6, GLM-5.1) at these prices.</p>
+  <table class="models">
+    <thead><tr><th>Model (served id)</th><th class="num">Params, total / active</th><th>Attention and KV design</th><th class="num">KV / context</th><th class="num">$ / M in, out</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>gpt-oss-20b</td><td class="num">21B / 3.6B</td><td>alternating full and 128-token window; GQA, 8 KV heads</td><td class="num">132 MB</td><td class="num">0.07, 0.28</td><td><a href="#ref-gptoss">OpenAI (2025)</a></td></tr>
+      <tr><td>gpt-oss-120b</td><td class="num">117B / 5.1B</td><td>same pattern, 36 layers</td><td class="num">198 MB</td><td class="num">0.15, 0.60</td><td><a href="#ref-gptoss">OpenAI (2025)</a></td></tr>
+      <tr><td>gemma-4-31B-it</td><td class="num">31B dense</td><td>5 sliding (1024) : 1 global; keys reused as values in global layers</td><td class="num">1,015 MB</td><td class="num">0.14, 0.56</td><td><a href="#ref-gemma4">Gemma Team (2026)</a></td></tr>
+      <tr><td>DeepSeek-V4-Flash</td><td class="num">284B / 13B</td><td>compressed sparse (4×) and heavily compressed (128×) attention, shared-KV, FP8 cache</td><td class="num">21 MB</td><td class="num">0.14, 0.28</td><td><a href="#ref-dsv4">DeepSeek-AI (2026)</a></td></tr>
+      <tr><td>MiniMax-M2.5</td><td class="num">229B / 10B<sup>a</sup></td><td>full attention in all 62 layers; GQA, 8 KV heads</td><td class="num">1,335 MB</td><td class="num">0.30, 1.20</td><td><a href="#ref-minimax">MiniMax (2025)</a></td></tr>
+      <tr><td>Qwen3.5-397B-A17B-FP8</td><td class="num">397B / 17B</td><td>3 Gated DeltaNet : 1 full attention, 60 layers</td><td class="num">342 MB</td><td class="num">0.60, 3.60</td><td><a href="#ref-qwen35">Qwen Team (2026)</a></td></tr>
+      <tr><td>Qwen3.8-27B-FP8</td><td class="num">27B dense</td><td>3 Gated DeltaNet : 1 full attention, 64 layers</td><td class="num">489 MB</td><td class="num">0.32, 3.20<sup>b</sup></td><td>model card</td></tr>
+      <tr><td>Kimi-K2.7-Code</td><td class="num">1T / 32B</td><td>multi-head latent attention (latent 512 + 64); INT4 experts</td><td class="num">370 MB</td><td class="num">0.96, 4.00<sup>b</sup></td><td><a href="#ref-kimi">Kimi Team (2025)</a></td></tr>
+      <tr><td>GLM-5.2 (NVFP4)</td><td class="num">744B / 40B</td><td>latent attention + DeepSeek sparse attention, shared indexer</td><td class="num">525 MB</td><td class="num">1.40, 4.40<sup>b</sup></td><td><a href="#ref-glm5">GLM-5-Team (2026)</a></td></tr>
+      <tr class="sep"><td>Intelif (self-hosted)</td><td class="num">4.0B dense</td><td>Qwen3-4B, full attention, GQA 8 KV heads; LoRA + scorer</td><td class="num">775 MB</td><td class="num">n/a</td><td><a href="#ref-intelif">Krishnan (2026)</a></td></tr>
+    </tbody>
+  </table>
+</div>
 
-<p>We report three outcomes. Quality is the game score relative to a beam-search bot on the same seeds, plus per-move regret against an approximate oracle that scores every legal placement by rollouts and a narrow search. Latency is time to first token or, for decisions, time from a request’s scheduled arrival to the first streamed prefix that parses as a legal move. Cost is estimated from the provider’s price card and the token counts it reports; it is an estimate, not an invoice. Four experiments, about 9,600 calls in total and $5.88 of estimated spend, are summarized in Appendix A.</p>
+<p>The models shrink the KV cache in different ways. Grouped-query attention shares key–value heads across query heads <a href="#ref-gqa">(Ainslie et al., 2023)</a>; sliding-window layers keep only the last 128 (gpt-oss) or 1,024 (gemma) tokens; latent attention stores one compressed vector per token, which cut the KV cache by 93% in DeepSeek-V2 <a href="#ref-dsv2">(DeepSeek-AI, 2024)</a>; DeepSeek-V4 compresses further and keeps an FP8 cache. Sparse attention reduces attention compute rather than memory, although its indexer still scales quadratically <a href="#ref-dsv32">(DeepSeek-AI, 2025</a>; <a href="#ref-indexcache">Bai et al., 2026)</a>. The Qwen models replace three of every four attention layers with Gated DeltaNet <a href="#ref-gdn">(Yang et al., 2025)</a>, a recurrent layer with a fixed-size state. Such hybrids are harder to prefix-cache: vLLM stores their state only at block boundaries, a mode it marks experimental <a href="#ref-vllmhybrid">(vLLM Team at IBM, 2025)</a>. MiniMax kept full attention in every layer, citing high cache-hit rates in real conversations as one reason <a href="#ref-minimax">(MiniMax, 2025)</a>. These designs give three predictions an agent can check from outside: if memory per context limited caching, capacity should fall as KV per context grows (P1); cold prefill time should grow with active parameters (P2); and the hybrid models should report only part of a repeated prefix as cached (P3).</p>
 
-<h2><span class="num">5</span>Findings</h2>
+<h2><span class="num">5</span>Method</h2>
 
-<h3><span class="num">5.1</span>Price and size do not buy decisions</h3>
+<p><strong>Task.</strong> The board is 10×20 with one piece of preview, and pieces are drawn uniformly at random from a generator seeded per game. The piece sequence depends only on the seed, never on how much an agent simulates, so all agents face identical games. Games stop at 100 pieces or when the stack tops out.</p>
 
-<p>Figure 3 places every model by what it costs and how well it plays. The ordering is not the one a price list or a parameter count suggests. gemma-4-31B, answering without a reasoning phase, reaches 0.88 of the beam-search score at $0.010 per 100 decisions with a median of 0.7 s per move. The most expensive model, GLM-5.2, reaches 0.35 at $0.15, and the largest, Qwen3.5-397B, barely scores at all. gpt-oss-120b improves from 0.51 to 0.76 when allowed medium reasoning, but each move then takes 8.3 s and costs more than six times as much. For an agent, the relevant ranking is quality per dollar and per second, and that ranking cannot be read off a leaderboard that reports quality alone.</p>
+<p><strong>Language-model agents (E1–E4).</strong> Each move, the agent receives the board, the current and next piece, and the legal placements, each annotated with its simulated outcome (lines cleared, new holes, height and surface change). It answers with a JSON object naming one placement; in E1 and E2 the output is constrained to legal placements by a JSON schema. gpt-oss models run at low reasoning effort (gpt-oss-120b also at medium, as a separate arm); gemma, Qwen, GLM and Kimi have thinking switched off through their chat template, and DeepSeek-V4-Flash answers directly by default. MiniMax-M2.5 cannot disable reasoning and exceeded 2,048 reasoning tokens on every move in a smoke test, so it appears only in E3.</p>
 
-<figure id="fig-ladder">
-  <img src="figures/ladder.svg" alt="Scatter of game score relative to beam search against cost per 100 decisions for nine model configurations">
-  <figcaption><span class="label">Figure 3.</span>Decision quality against estimated cost, nine model configurations, three seeds each, up to 100 pieces per game, no history, output constrained to legal placements. The score is relative to a beam-search bot on the same seeds (1.0). Colored points are the models used elsewhere in the paper.</figcaption>
+<p><strong>Decision-model agent (E5).</strong> Intelif receives the same board and pieces; each legal placement is one option, described by the same simulated outcome, following Intelif’s own Tetris example. It plays the most probable option. It runs on the container we used for everything else: a 4-core Intel Xeon at 2.8 GHz with AVX-512 and no GPU. We keep the released bf16 weights but compute in fp32, which on three test positions picked the same moves as bf16 with probabilities within 0.003, three times faster; dynamic int8 was seven times faster but changed the first move, so we did not use it.</p>
+
+<p><strong>Outcomes.</strong> Quality is the game score relative to a beam-search bot on the same seeds, (score − random) / (beam − random), and the per-move regret against an approximate oracle that scores every legal placement by rollouts and a narrow beam search with common random numbers. Latency is wall time per decision measured by the client. Cost is estimated from the list price and the token counts the API reports. The provider states that cached input is free on every model, but four model cards show no cached price and the billing API is not readable with an inference key, so we report cost under the stated policy and, where it matters, an upper bound that bills cached input at the full input price.</p>
+
+<p><strong>Capacity probe (E3).</strong> N agents each send a unique context of about 5.6k tokens (a random nonce in the system prompt followed by eight turns of a Tetris game) with a one-token output, stay idle for 30 s, then send the same context plus one turn. An agent counts as warm when the second request reports at least half of the first one’s prompt as cached and both requests succeeded. GLM-5.2 reports no cached tokens, so its hits are inferred from latency (second request faster than 0.35 of its cold median); this rule agrees with reported hits on 92% of agents on the models that report them. N runs from 1 to 64 in randomized order, with one to five repetitions per model depending on price. Aggregate prefill throughput is N × the context length divided by the slowest first request of the round.</p>
+
+<p><strong>Design and statistics.</strong> Hypotheses, metrics and decision rules for every experiment were written down before its data (Appendix A lists deviations). Games are the independent unit: intervals for scores and paired differences come from 2,000 bootstrap resamples of seeds, and rank correlations are bootstrapped the same way. Hit rates carry Wilson 95% intervals. E4 uses the two-level paired bootstrap (time blocks, then requests) of its pilot. To keep our own traffic from contaminating cache and latency measurements, E3 ran alone, E1 and E2 ran together, and E4 ran alone; E5 sends no API traffic. Every call is logged raw (timestamps, status, reported tokens, response text and, for E5, the probability of every option), and every figure is regenerated from these logs.</p>
+
+<h2><span class="num">6</span>Results</h2>
+
+[[RESULTS_E1]]
+
+[[RESULTS_E2]]
+
+<h3><span class="num">6.3</span>How many agents a deployment keeps warm (E3)</h3>
+
+<p>Every deployment cached a repeated 5.5k-token context when one agent used it. How many agents it could serve that way differed by more than an order of magnitude (Figure 5a; all nine models in Appendix B). gpt-oss-20b and gpt-oss-120b kept all 64 concurrent contexts warm after 30 s of idleness, the most we tested. MiniMax-M2.5 and Qwen3.5-397B kept 32; gemma-4-31B, Qwen3.8-27B and Kimi-K2.7 kept 16; GLM-5.2 kept 8; DeepSeek-V4-Flash kept 4. Beyond capacity the loss is abrupt: gemma kept 98% of 16 contexts but 2% of 32, and a context that had been evicted took 12 to 19 times longer to serve again (2.3 s instead of 0.19 s on gemma; 6.3 s instead of 0.33 s on DeepSeek). Past capacity most deployments also began refusing requests: at 32 or 64 agents, 62% of DeepSeek’s agents and 54% of gemma’s had a request refused with HTTP 429 (“Server is overloaded”), while the gpt-oss deployments refused none.</p>
+
+<figure id="fig-capacity">
+  <img src="figures/capacity.svg" alt="Four panels: share of agent contexts still cached against concurrent agents, aggregate prefill throughput against concurrent agents, and capacity against estimated KV cache size and against peak throughput for nine models">
+  <figcaption><strong>Figure 5:</strong> How many agent contexts a deployment keeps warm. N agents each send a unique 5.5k-token context, wait 30 s and send it again. (a) Share still served from cache, and (b) aggregate prefill throughput, for the four models whose curves show the pattern most clearly (all nine in Figure B1). (c, d) Capacity, the largest N with at least 90% of contexts still cached, against the KV cache one context needs and against the deployment’s peak aggregate prefill throughput. Arrows mark capacities at the largest N tested. Seventeen rounds in which two large rounds overlapped were excluded; 5,526 calls in total.</figcaption>
 </figure>
 
-<h3><span class="num">5.2</span>The price card decides which memory is cheap</h3>
+<p>The architecture does not explain the ranking (P1). The model with the smallest KV cache per context, DeepSeek-V4-Flash at an estimated 21 MB, keeps the fewest contexts, and the one with the largest, MiniMax-M2.5 at 1.4 GB, keeps 32; across the nine models the rank correlation between capacity and KV size is −0.12 (Figure 5c). What capacity does track is how much prefill work a deployment can do at once (Figure 5d, Spearman +0.96). gpt-oss-20b’s aggregate throughput grew from 10k to 31k tokens per second as agents were added, a sign of many parallel replicas, while DeepSeek stayed near 4.8k and gemma near 6.6k, as if requests were processed by a single replica in turn. Measured in tokens, DeepSeek’s capacity also matches our pilot two days earlier with 15k-token contexts: it kept one context but not four then (between 15k and 60k tokens), and four 5.5k contexts but not eight now (between 22k and 44k). Even 44k tokens of DeepSeek’s compact cache is about 150 MB by our estimate, far below the KV memory of one GPU, so the limit is a property of how much cache and hardware the deployment allots, or of how many other tenants share it, not of the model. Two architectural predictions do hold. Cold prefill took longer on models with more active parameters (P2; Spearman +0.82 across the nine models), from 0.54 s on gpt-oss-20b to 1.5 s on Kimi and 3.6 s on GLM-5.2. And the two Gated DeltaNet hybrids reported only part of a repeated prefix as cached (P3): Qwen3.5 always 5,280 of 5,684 tokens (93%) and Qwen3.8 always 4,704 (83%), exactly the prompt rounded down to a multiple of a large block, as block-aligned caching of the recurrent state predicts. The other models cache all but at most the last 140 tokens. A Qwen3.8 agent therefore re-pays up to about 1.5k tokens of prefill on every turn.</p>
 
-<p>Agents carry memory by resending history. Figure 4 compares three common policies: no history, appending every turn, and keeping the last eight turns. On gpt-oss-20b and gpt-oss-120b, which bill cached input at $0, appending costs the same as no history even though the prompt grows past 10,000 tokens, because the stable prefix is served from cache. The eight-turn window looks thriftier but costs five to six times more: dropping the oldest turn rewrites the prefix right after the system prompt, so thousands of tokens are re-processed and billed on every move. On DeepSeek-V4-Flash the ranking flips. Its cache works (84% of the appended prompt is a reported hit), but it lists no cached price, so appending becomes the most expensive policy at ten times the cost of no history.</p>
+[[RESULTS_E4]]
 
-<figure id="fig-memory">
-  <img src="figures/memory.svg" alt="Cost and regret for three memory policies on three models">
-  <figcaption><span class="label">Figure 4.</span>Three memory policies on three models, four paired seeds each. Left: estimated cost per 100 decisions (log scale). Right: per-move regret against the oracle. Appending every turn keeps the prompt prefix stable, so the cache serves 95% of it; a sliding window rewrites the prefix every move.</figcaption>
-</figure>
+[[RESULTS_E5]]
 
-<p>Quality points the other way. On this task the board is fully visible, so history adds no information, and appending raises per-move regret from 0.95 to 4.37 on gpt-oss-20b and from 0.55 to 3.20 on gpt-oss-120b. Long, repetitive context hurts decisions, consistent with earlier findings on long-context use <a href="#ref-lost">(Liu et al., 2024a)</a>. The memory that is cheapest to serve is the one that plays worst, and whether it is cheap at all depends on a line of the price card that most model comparisons never mention.</p>
+<h2><span class="num">7</span>Discussion</h2>
 
-<h3><span class="num">5.3</span>Caching works everywhere; who pays for it and how many agents it holds do not</h3>
+<p>[[DISCUSSION]]</p>
 
-<p>Every model we tested caches long prefixes: a repeated 16k-token prompt starts answering in 0.45–0.8 s instead of 1.0–10.5 s (Figure 5a). Whether that saving reaches the user is another matter. Five models bill a cache hit at no charge, so a warm call costs under half a percent of a cold one. Four list no cached price and bill the hit in full, delivering the latency win without the cost win. One of them, GLM-5.2, reports no cache hits at all, although its timing shows them. Parallel requests widen the gap: when four or eight simultaneous requests share a 14k-token prefix, the endpoint processes the prefix about once, but a model without a cached price bills it four or eight times.</p>
+<h2><span class="num">8</span>Limitations</h2>
 
-<figure id="fig-cache">
-  <img src="figures/cache.svg" alt="Cold and repeated time to first token for nine models, and cache hit rate and latency against concurrent agents">
-  <figcaption><span class="label">Figure 5.</span>(a) Time to first token for a fresh 16k-token prompt and its exact repeat, two trials per model. *GLM-5.2 reports zero cached tokens yet answers the repeat 13 times faster. (b) Share of 15k-token agent contexts still cached after 30 s idle, as more agents run at once. (c) Median latency to serve them again.</figcaption>
-</figure>
+<p>All API measurements come from one provider over two days, on a shared platform whose other traffic we cannot see; they describe these deployments at that time, not the models in general. Model identifiers do not prove which checkpoint or quantization was served. Capacity is measured with one context length, one idle gap and one to five repetitions per model, and refusals at high load also reduce the number of contexts that reached the cache. Costs are estimates from list prices and reported token counts; the billing record is not readable with an inference key. The oracle is approximate. Tetris has a fully visible state, which is why history did not help here; tasks with hidden state may reward memory. The decision model was tested on one CPU, on three games, with the prompt format of its own Tetris example; a GPU, other prompts, or Jev itself could behave differently. Appendix A lists every deviation from the written plans, including excluded rounds, a dropped arm and the reduced scope of E5.</p>
 
-<p>Capacity differs even more (Figure 5b, c). With 16 concurrent agents each holding a 15k-token context, gpt-oss-20b still had every context cached after 30 s of idleness. DeepSeek-V4-Flash kept a single context warm: with four or more agents it found none of them cached in 28 attempts, its re-serving latency rose from 3.9 s to 23.5 s, and at 16 agents it began refusing requests. gemma-4-31B started losing contexts at 12. How many agents a deployment keeps warm is a property of that deployment, not of the weights, and it decides whether an agent fleet runs at cached or uncached prices and speeds.</p>
+<h2><span class="num">9</span>Conclusion</h2>
 
-<h3><span class="num">5.4</span>An agent’s own long requests slow its short ones</h3>
-
-<p>Agents mix traffic. A fleet sends short per-move decisions and, now and then, long requests that summarize or plan over a large context. We replayed the same frozen requests, with the same arrival times, under four client policies: short requests alone, everything in one first-in-first-out queue, the same queue with vLLM-style priority hints, and a candidate rule we call defer-long. Defer-long sends a long request only when no short one is waiting or in flight, keeps at most one long request outstanding, and stops deferring after 6 s. Every request carried a fresh random prefix, so no condition could benefit from another’s cache.</p>
-
-<figure id="fig-interference">
-  <img src="figures/interference.svg" alt="Distribution of time to a valid move, useful decisions per second by condition, and endpoint delay against the number of long requests in prefill">
-  <figcaption><span class="label">Figure 6.</span>Short (about 1k-token) decisions sent alone or mixed with long (about 19k-token) requests, same arrival times in every condition, four time blocks per model. (a) Time from scheduled arrival to a valid move for gemma-4-31B. (b) Valid moves delivered within 2.5 s, per second of trace. (c) Endpoint time to first byte of a short request, by how many long requests were still waiting for their own first byte when it was sent.</figcaption>
-</figure>
-
-<p>On gemma-4-31B, mixing in long requests raised the 95th-percentile time to a valid move from 0.92 s to 15.4 s (+1577%, 95% CI +726% to +1866%; Figure 6a). On DeepSeek-V4-Flash, more than 5% of short decisions never produced a valid move under mixed load, so its tail became unbounded. Part of the delay is the client’s own queue, but Figure 6c shows the rest arises inside the endpoint: a short request’s time to first byte grew from 0.5 s to 3.0 s when one long request was still being prefilled and to 4.9 s with two, while a plain network probe moved by only 0.2 s. Priority hints, which the endpoint accepts, changed nothing we could measure.</p>
-
-<p>Defer-long cut gemma’s 95th percentile by 69% (95% CI 41% to 74%) and raised the rate of useful decisions by 63%, with the same requests and the same cost (Figure 6b). It cannot remove the delay for short requests that arrive while a long one is already being prefilled, and it makes long requests wait longer. This is a pilot: its preregistered quality check, that oracle regret worsens by no more than 0.15, was missed by a hair (upper confidence bound +0.151), so we do not yet claim that defer-long is free. The broader point stands on firmer ground. Prefill interference, which serving papers solve inside the engine, is still visible to a tenant of a production endpoint, and a few lines of client code can recover most of it.</p>
-
-<h2><span class="num">6</span>What this means for evaluating open-weight models</h2>
-
-<p>The numbers above are not properties of any model’s weights. They belong to the combination of weights, deployment and agent behavior, and they are as large as the differences between models. Three practical consequences follow.</p>
-
-<p>First, an evaluation of an open-weight model should report the serving context it was measured in: provider and model identifier, the full price card including cached input, reported cache behavior, concurrency and time of measurement, and the agent’s memory policy. A leaderboard row without these is a statement about weights that the reader cannot act on. Second, agents should be evaluated as systems. Quality per dollar and per second, measured under the agent’s real traffic, can reorder model choices that quality alone would make. Third, providers can make this easier by publishing a cached-input price, reporting cache hits honestly, and stating how many concurrent contexts a deployment keeps warm and what priority fields actually do.</p>
-
-<h2><span class="num">7</span>Limitations</h2>
-
-<p>All measurements come from one provider, over two days, on a shared platform whose other traffic we cannot see. Arms were run concurrently or in randomized order to cancel slow drift, but the results describe this deployment at this time, not the models in general. Seeds are few (three to four per pilot), the oracle is approximate, and costs are price-card estimates. Provider model identifiers do not prove which checkpoint or quantization was served. Tetris is one task with fully visible state, which is why history hurt here; tasks with hidden state may reward memory. The interference study is a pilot on the development corpus, with one documented protocol change (gpt-oss-20b was replaced because its raw-prompt answers mostly ran out of tokens while reasoning); a held-out corpus is built but untouched.</p>
-
-<h2><span class="num">8</span>Conclusion</h2>
-
-<p>Open weights are often discussed as if the model were the product. For an agent, the product is the model as served, under a price card, behind a cache, next to other traffic, and driven by the agent’s own habits. Using Tetris as a cheap and exact instrument, we found that these factors change cost by an order of magnitude, change tail latency by more than an order of magnitude, and change which model looks best. Measuring them takes a few dollars and a replayable harness. We hope future evaluations of open-weight models will report not just the weights, but the stack they were served on.</p>
+<p>[[CONCLUSION]]</p>
 
 <h2>References</h2>
 <ol class="refs">
+<!--REFS-->
   <li id="ref-sarathi">Agrawal, A., Kedia, N., Panwar, A., Mohan, J., Kwatra, N., Gulavani, B. S., Tumanov, A., and Ramjee, R. Taming throughput-latency tradeoff in LLM inference with Sarathi-Serve. OSDI 2024.</li>
+  <li id="ref-gqa">Ainslie, J., Lee-Thorp, J., de Jong, M., Zemlyanskiy, Y., Lebrón, F., and Sanghai, S. GQA: Training generalized multi-query transformer models from multi-head checkpoints. EMNLP 2023. arXiv:2305.13245.</li>
   <li id="ref-algorta">Algorta, S. and Şimşek, Ö. The game of Tetris in machine learning. Video Games and Machine Learning Workshop at ICML 2017. arXiv:1905.01652.</li>
+  <li id="ref-typesafe">Almeida, D. Introducing System One models &amp; Jev. TypeSafe AI blog, 15 September 2026. typesafe.ai/blog/introducing-system-one-models-and-jev, accessed October 2026.</li>
+  <li id="ref-dindex">apolinario. Decision Index, edition 0.2.1. GitHub repository, 27 September 2026. github.com/apolinario/decision-index, accessed October 2026.</li>
+  <li id="ref-indexcache">Bai, Y., Dong, Q., Jiang, T., et al. IndexCache: Accelerating sparse attention via cross-layer index reuse. arXiv:2603.12201, 2026.</li>
   <li id="ref-cai">Cai, W., Shi, T., Zhao, X., and Song, D. Are you getting what you pay for? Auditing model substitution in LLM APIs. arXiv:2504.04715, 2025.</li>
-  <li id="ref-slos">Chen, S., Jia, Z., Khan, S., Krishnamurthy, A., and Gibbons, P. B. SLOs-Serve: Optimized serving of multi-SLO LLMs. arXiv:2504.08784, 2025.</li>
-  <li id="ref-arena">Chiang, W.-L., Zheng, L., Sheng, Y., Angelopoulos, A. N., Li, T., Li, D., Zhu, B., Zhang, H., Jordan, M., Gonzalez, J. E., and Stoica, I. Chatbot Arena: An open platform for evaluating LLMs by human preference. ICML 2024.</li>
+  <li id="ref-jev">Crabtree, M. Jev: TypeSafe’s System One model explained. DataCamp blog, 16 September 2026. datacamp.com/blog/system-one-models-jev, accessed October 2026.</li>
   <li id="ref-tail">Dean, J. and Barroso, L. A. The tail at scale. Communications of the ACM, 56(2):74–80, 2013.</li>
-  <li id="ref-demaine">Demaine, E. D., Hohenberger, S., and Liben-Nowell, D. Tetris is hard, even to approximate. COCOON 2003, LNCS 2697, pp. 351–363.</li>
+  <li id="ref-dsv2">DeepSeek-AI. DeepSeek-V2: A strong, economical, and efficient mixture-of-experts language model. arXiv:2405.04434, 2024.</li>
+  <li id="ref-dsv32">DeepSeek-AI. DeepSeek-V3.2: Pushing the frontier of open large language models. arXiv:2512.02556, 2025.</li>
+  <li id="ref-dsv4">DeepSeek-AI. DeepSeek-V4: Towards highly efficient million-token context intelligence. arXiv:2606.19348, 2026.</li>
   <li id="ref-cachedattn">Gao, B., He, Z., Sharma, P., Kang, Q., Jevdjic, D., Deng, J., Yang, X., Yu, Z., and Zuo, P. Cost-efficient large language model serving for multi-turn conversations with CachedAttention. USENIX ATC 2024.</li>
+  <li id="ref-gemma4">Gemma Team. Gemma 4 technical report. arXiv:2607.02770, 2026.</li>
+  <li id="ref-glm5">GLM-5-Team. GLM-5: From vibe coding to agentic engineering. arXiv:2602.15763, 2026.</li>
   <li id="ref-gu">Gu, C., Li, X. L., Kuditipudi, R., Liang, P., and Hashimoto, T. Auditing prompt caching in language model APIs. ICML 2025.</li>
+  <li id="ref-lora">Hu, E. J., Shen, Y., Wallis, P., et al. LoRA: Low-rank adaptation of large language models. arXiv:2106.09685, 2021.</li>
   <li id="ref-lmgame">Hu, L., Huo, M., Zhang, Y., Yu, H., Xing, E. P., Stoica, I., Rosing, T., Jin, H., and Zhang, H. lmgame-Bench: How good are LLMs at playing games? ICLR 2026.</li>
-  <li id="ref-kapoor">Kapoor, S., Bommasani, R., Klyman, K., et al. Position: On the societal impact of open foundation models. ICML 2024.</li>
+  <li id="ref-kimi">Kimi Team. Kimi K2: Open agentic intelligence. arXiv:2507.20534, 2025.</li>
+  <li id="ref-intelif">Krishnan, S. Intelif v0.1: Typed probabilistic decisions from a small open model. GitHub repository SkAndMl/intelif (code MIT; weights UserMoonlight/intelif-qwen3-4b, CC BY-NC 4.0), 2026. Accessed October 2026.</li>
   <li id="ref-vllm">Kwon, W., Li, Z., Zhuang, S., Sheng, Y., Zheng, L., Yu, C. H., Gonzalez, J. E., Zhang, H., and Stoica, I. Efficient memory management for large language model serving with PagedAttention. SOSP 2023.</li>
   <li id="ref-helm">Liang, P., Bommasani, R., Lee, T., et al. Holistic evaluation of language models. Transactions on Machine Learning Research, 2023.</li>
-  <li id="ref-lost">Liu, N. F., Lin, K., Hewitt, J., Paranjape, A., Bevilacqua, M., Petroni, F., and Liang, P. Lost in the middle: How language models use long contexts. Transactions of the ACL, 12:157–173, 2024a.</li>
-  <li id="ref-agentbench">Liu, X., Yu, H., Zhang, H., et al. AgentBench: Evaluating LLMs as agents. ICLR, 2024b.</li>
+  <li id="ref-agentbench">Liu, X., Yu, H., Zhang, H., et al. AgentBench: Evaluating LLMs as agents. ICLR 2024b.</li>
   <li id="ref-lmcache">Liu, Y., Cheng, Y., Yao, J., et al. LMCache: An efficient KV cache layer for enterprise-scale LLM inference. arXiv:2510.09665, 2025.</li>
   <li id="ref-autellix">Luo, M., Shi, X., Cai, C., et al. Autellix: An efficient serving engine for LLM agents as general programs. arXiv:2502.13965, 2025.</li>
+  <li id="ref-minimax">MiniMax. Why did M2 end up as a full attention model? MiniMax news, 29 October 2025. minimax.io/news/why-did-m2-end-up-as-a-full-attention-model, accessed October 2026.</li>
   <li id="ref-k2">MoonshotAI. K2-Vendor-Verifier. GitHub repository, github.com/MoonshotAI/K2-Vendor-Verifier, accessed October 2026.</li>
   <li id="ref-gptoss">OpenAI. gpt-oss-120b &amp; gpt-oss-20b model card. arXiv:2508.10925, 2025.</li>
   <li id="ref-balrog">Paglieri, D., Cupiał, B., Coward, S., et al. BALROG: Benchmarking agentic LLM and VLM reasoning on games. ICLR 2025.</li>
   <li id="ref-splitwise">Patel, P., Choukse, E., Zhang, C., Shah, A., Goiri, Í., Maleki, S., and Bianchini, R. Splitwise: Efficient generative LLM inference using phase splitting. ISCA 2024.</li>
   <li id="ref-mooncake">Qin, R., Li, Z., He, W., Cui, J., Ren, F., Zhang, M., Wu, Y., Zheng, W., and Xu, X. Mooncake: Trading more storage for less computation, a KVCache-centric architecture for serving LLM chatbot. FAST 2025.</li>
-  <li id="ref-agentservesim">Rajib, R. H., Zheng, M., and Lou, Q. AgentServeSim: Serving-system simulation and policy search for LLM agent programs. arXiv:2606.09613, 2026.</li>
+  <li id="ref-qwen35">Qwen Team. Qwen3.5: Towards native multimodal agents. Model card, Hugging Face (Qwen/Qwen3.5-397B-A17B-FP8), 2026. Accessed October 2026.</li>
   <li id="ref-mlperf">Reddi, V. J., Cheng, C., Kanter, D., et al. MLPerf inference benchmark. ISCA 2020.</li>
   <li id="ref-schroeder">Schroeder, B., Wierman, A., and Harchol-Balter, M. Open versus closed: A cautionary tale. NSDI 2006.</li>
-  <li id="ref-preble">Srivatsa, V., He, Z., Abhyankar, R., Li, D., and Zhang, Y. Preble: Efficient distributed prompt scheduling for LLM serving. ICLR 2025.</li>
-  <li id="ref-llumnix">Sun, B., Huang, Z., Zhao, H., Xiao, W., Zhang, X., Li, Y., and Lin, W. Llumnix: Dynamic scheduling for large language model serving. OSDI 2024.</li>
-  <li id="ref-hygen">Sun, T., Wang, P., and Lai, F. HyGen: Efficient LLM serving via elastic online-offline request co-location. NeurIPS 2025.</li>
-  <li id="ref-fastserve">Wu, B., Zhong, Y., Zhang, Z., et al. Fast distributed inference serving for large language models. arXiv:2305.05920, 2023.</li>
-  <li id="ref-cacheblend">Yao, J., Li, H., Liu, Y., et al. CacheBlend: Fast large language model serving for RAG with cached knowledge fusion. EuroSys 2025.</li>
+  <li id="ref-vllmhybrid">vLLM Team at IBM. Hybrid models as first-class citizens in vLLM. PyTorch blog, 5 November 2025. pytorch.org/blog/hybrid-models-as-first-class-citizens-in-vllm, accessed October 2026.</li>
+  <li id="ref-qwen3">Yang, A., Li, A., Yang, B., et al. Qwen3 technical report. arXiv:2505.09388, 2025.</li>
+  <li id="ref-gdn">Yang, S., Kautz, J., and Hatamizadeh, A. Gated delta networks: Improving Mamba2 with delta rule. ICLR 2025. arXiv:2412.06464.</li>
   <li id="ref-orca">Yu, G.-I., Jeong, J. S., Kim, G.-W., Kim, S., and Chun, B.-G. Orca: A distributed serving system for transformer-based generative models. OSDI 2022.</li>
   <li id="ref-yuan">Yuan, R., Zeng, Y., Gao, X., Yu, L., Liao, H., and Wang, H. Scheduling the unschedulable: Taming black-box LLM inference at scale. arXiv:2604.06970, 2026.</li>
   <li id="ref-sglang">Zheng, L., Yin, L., Xie, Z., et al. SGLang: Efficient execution of structured language model programs. NeurIPS 2024.</li>
   <li id="ref-distserve">Zhong, Y., Liu, S., Chen, J., Hu, J., Zhu, Y., Liu, X., Jin, X., and Zhang, H. DistServe: Disaggregating prefill and decoding for goodput-optimized large language model serving. OSDI 2024.</li>
+<!--/REFS-->
 </ol>
 
-<h2 class="appendix-start"><span class="num">A</span>Experiments in detail</h2>
+<h2 class="appendix-start"><span class="num">A</span>Experiments, calls and deviations</h2>
 
-<div class="table-wrap">
-  <p class="table-caption"><span class="label">Table A1.</span>The four experiments behind Section 5, plus the platform probe. Cost is estimated from the provider’s price card; calls include failures. Iteration numbers refer to run directories under runs/explore/.</p>
-  <table>
-    <thead>
-      <tr><th>Experiment</th><th>Question</th><th>Models</th><th>Design</th><th class="num">Calls</th><th class="num">Est. cost</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>Probe (iteration 0)</td><td>Does every model stream, cache and report usage?</td><td>all 9</td><td>cold and repeated 3.5k and 16k prefixes, 2 trials</td><td class="num">298</td><td class="num">$0.43</td></tr>
-      <tr><td>Model ladder (iteration 6), §5.1</td><td>Which model decides well per dollar?</td><td>9 configurations</td><td>3 seeds × up to 100 pieces, no history, legal-placement schema</td><td class="num">3,799</td><td class="num">$1.70</td></tr>
-      <tr><td>Memory × price card (iterations 1–2), §5.2</td><td>Which memory policy is cheap, and does it play well?</td><td>gpt-oss-20b, gpt-oss-120b, DeepSeek-V4-Flash</td><td>3–4 policies × 4 paired seeds × up to 100 pieces</td><td class="num">3,088</td><td class="num">$1.00</td></tr>
-      <tr><td>Cache lifetime, capacity, fan-out (iterations 3–5), §5.3</td><td>How long and for how many agents does a context stay warm?</td><td>all 9; capacity on 2</td><td>1–16 concurrent 15k contexts, idle gaps 5–600 s, isolated controls</td><td class="num">756</td><td class="num">$2.04</td></tr>
-      <tr><td>Interference (iteration 8), §5.4</td><td>Do long requests delay short ones, and does admission help?</td><td>gemma-4-31B, DeepSeek-V4-Flash</td><td>4 time blocks × 4 conditions, open-loop replay, 2,210 requests</td><td class="num">1,675</td><td class="num">$0.70</td></tr>
-    </tbody>
-  </table>
-</div>
+[[APPX_TABLE]]
 
-<p><strong>Environment and interface.</strong> The board is 10 wide and 20 tall, with one piece of preview and placements given as rotation and column followed by a straight drop. Clearing one to four lines scores 2, 5, 15 or 60 points. The piece generator is seeded per episode and independent of the agent; lookahead uses separate random streams, so search agents cannot see or consume the real sequence. Game experiments cap episodes at 100 pieces. Model prompts list the legal placements; the model ladder additionally constrains output to a JSON schema over legal placements.</p>
+[[APPX_DEVIATIONS]]
 
-<p><strong>Quality.</strong> The oracle scores each legal placement by greedy rollouts plus a narrow beam search on sampled futures with common random numbers. It ranks moves consistently but is not ground truth. On the same seeds the beam-search bot has a regret of 0.12 per move and greedy play 0.21.</p>
+<h2><span class="num">B</span>Cache capacity of every model</h2>
 
-<p><strong>Interference protocol.</strong> Hypotheses, metrics and margins were written down before any live data (notes/interference_novelty_matrix.md). The corpus holds 160 short and 40 long frozen decisions from development seeds, with oracle tables, rebuilt and hash-checked on every request. Traces are 40 s of Poisson arrivals, with short requests at 1.0/s, long ones at 0.15/s and a path probe every 2 s. Each block replays one trace under all four conditions in random order. Analysis uses a two-level paired bootstrap over time blocks and requests (2,000 replicates). Decisions that never become valid count as infinitely slow, so failures can only worsen tails. The run had 0 errors, timeouts or rejections among 2,210 requests. Results by block, the decomposition into client queueing and endpoint delay, and all preregistered verdicts are in runs/explore/interference/live_pilot_v2/report.md.</p>
+<figure id="fig-capacity-all">
+  <img src="figures/capacity_all.svg" alt="Nine small panels, one per model, showing the share of agent contexts still cached and the share of requests refused against concurrent agents">
+  <figcaption><strong>Figure B1:</strong> Cache capacity of every served model, ordered by capacity. Each panel shows the share of agents whose context was still served from cache after 30 s (line; band: Wilson 95% interval over agents) and the share of agents with a refused request (dashed), against N concurrent agents with 5.5k-token contexts. Rounds per point: 1–5 depending on the model’s price (Appendix A). GLM-5.2 reports no cached tokens; its hits are inferred from latency (a repeat faster than 0.35 of its cold median), a rule that agrees with reported hits on 92% of agents on the eight models that report them. The main text (Figure 5a, b) shows the four models with the clearest curves; Kimi-K2.7, Qwen3.8, Qwen3.5 and GLM-5.2 were measured with one repetition each, so their intervals are wide.</figcaption>
+</figure>
+
+<h2><span class="num">C</span>The decision-model agent</h2>
+
+[[APPX_DECISION]]
 
 <section class="keep">
-<h2><span class="num">B</span>Reproducing the paper</h2>
+<h2><span class="num">D</span>Reproducing the paper</h2>
 
-<p>Every figure is generated from committed run data. The live experiments need an API key for the provider and stay within the budgets shown above; everything else runs offline.</p>
+<p>Every number and figure is regenerated from the committed raw logs. Live experiments need a provider API key and stay within the budgets in Table A1; everything else runs offline on a CPU.</p>
 
-<pre class="cmd">python paper/figures.py                      # all figures, from runs/explore/
-python paper/build.py                        # figures + paper.pdf (headless Chromium)
-python -m pytest tests -q                    # offline tests, no API calls
-python -m harness.compare_gif --steps runs/explore/iter06/steps.csv --seed 1001 --pieces 100 \
-    --arms gemma-4-31B/direct,gpt-oss-20b/low,DeepSeek-V4-Flash/direct --bots beam
-python -m llm.interference_pilot sim --config configs/interference/pilot_v2.yaml --out &lt;fresh dir&gt;
-python -m llm.interference_analysis runs/explore/interference/live_pilot_v2</pre>
+<pre class="cmd">python -m llm.capacity_sweep --config configs/scaleup/capacity.yaml --out runs/explore/scaleup/capacity      # E3 (parts 2-3: *_part2.yaml, *_part3.yaml)
+python -m llm.capacity_analysis runs/explore/scaleup/capacity runs/explore/scaleup/capacity_part2 [..._part3] --out runs/explore/scaleup/capacity_analysis
+python -m llm.run_pilot --config configs/scaleup/ladder.yaml --out_dir runs/explore/scaleup/ladder --skip_oracle   # E1
+python -m llm.run_pilot --config configs/scaleup/memory.yaml --out_dir runs/explore/scaleup/memory --skip_oracle   # E2
+python -m llm.add_oracle runs/explore/scaleup/ladder runs/explore/scaleup/memory --workers 4
+python -m llm.scaleup_analysis ladder runs/explore/scaleup/ladder; python -m llm.scaleup_analysis memory runs/explore/scaleup/memory
+python -m llm.interference_pilot live --config configs/interference/confirm_gemma.yaml --out runs/explore/interference/confirm_gemma   # E4
+python -m llm.interference_analysis runs/explore/interference/confirm_gemma
+python -m llm.decision_model --seeds 1000,1001,1002 --dtype fp32compute --threads 3 --out runs/explore/scaleup/intelif   # E5 (Python 3.12 + intelif)
+python -m llm.scaleup_analysis intelif runs/explore/scaleup/intelif
+python paper/build.py                                                     # figures, references, PDF</pre>
 </section>
 
 </body>

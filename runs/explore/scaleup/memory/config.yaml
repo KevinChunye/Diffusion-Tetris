@@ -1,0 +1,72 @@
+iteration: 11
+name: memory_scaleup
+model: openai/gpt-oss-20b
+seeds:
+- 5100
+- 5101
+- 5102
+- 5103
+- 5104
+- 5105
+- 5106
+- 5107
+- 5108
+max_pieces: 100
+budget_usd: 3.6
+concurrency: 6
+client:
+  max_retries: 3
+oracle:
+  n_samples: 2
+  depth: 4
+  beam_h: 2
+  beam_w: 4
+  beam_samples: 1
+defaults:
+  annotated: true
+  layout: static_first
+  response_format: json_schema
+  max_tokens: 32
+arms:
+  gpt-oss-20b/stateless:
+    model: openai/gpt-oss-20b
+    history: stateless
+    max_tokens: 1024
+  gpt-oss-20b/append:
+    model: openai/gpt-oss-20b
+    history: append
+    max_tokens: 1024
+  gpt-oss-20b/window8:
+    model: openai/gpt-oss-20b
+    history: window
+    window: 8
+    max_tokens: 1024
+  gpt-oss-120b/stateless:
+    model: openai/gpt-oss-120b
+    history: stateless
+    max_tokens: 1024
+  gpt-oss-120b/append:
+    model: openai/gpt-oss-120b
+    history: append
+    max_tokens: 1024
+  gpt-oss-120b/window8:
+    model: openai/gpt-oss-120b
+    history: window
+    window: 8
+    max_tokens: 1024
+  DeepSeek-V4-Flash/stateless:
+    model: deepseek-ai/DeepSeek-V4-Flash
+    history: stateless
+  DeepSeek-V4-Flash/append:
+    model: deepseek-ai/DeepSeek-V4-Flash
+    history: append
+  DeepSeek-V4-Flash/window8:
+    model: deepseek-ai/DeepSeek-V4-Flash
+    history: window
+    window: 8
+  Qwen3.8-27B/stateless:
+    model: Qwen/Qwen3.8-27B-FP8
+    history: stateless
+  Qwen3.8-27B/append:
+    model: Qwen/Qwen3.8-27B-FP8
+    history: append

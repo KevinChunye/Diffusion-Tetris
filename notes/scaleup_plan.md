@@ -94,3 +94,11 @@ The container has 4 CPU cores and no GPU. The E1/E2 oracle needs about 1.6 CPU-s
   part 3 (same design, alone, before E1/E2).
 - E4's number of blocks per model is set just before it runs: the largest number ≤ 13 whose estimated
   cost (pilot: ≈$0.085 per block per model, full price) fits the remaining program budget.
+
+## Deviation log (filled in as runs finished)
+
+- **E2 (07:26 UTC).** The run reached its $3.6 cap (full-price accounting; Qwen3.8 append alone was $2.0) after
+  4,168 calls. 26 of 99 games were stopped by the guard: seeds 5107–5108 never started for most arms and a few
+  seed-5106/5107 games stopped part-way. These games are excluded; paired contrasts use, per model, the seeds on
+  which every policy finished (6–7 seeds). No E2 top-up was run, so that E4 keeps its budget.
+- **E1/E2 oracle.** Run after the API phase with `llm.add_oracle` (E2 with one worker while Intelif played).

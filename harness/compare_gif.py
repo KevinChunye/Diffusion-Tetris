@@ -37,7 +37,8 @@ from tetris_render import (BG, BOARD_BG, GOOD, MUTED, PANEL, TEXT, Move, PanelSt
 ACCENTS = [(110, 160, 255), (255, 170, 80), (120, 220, 160), (235, 120, 205), (200, 200, 90), (150, 130, 255)]
 # One color per model, shared with the paper's figures (paper/figures.py), so color follows the model.
 MODEL_ACCENTS = {"gemma-4-31B": (42, 120, 214), "DeepSeek-V4-Flash": (235, 104, 52), "gpt-oss-20b": (27, 175, 122),
-                 "gpt-oss-120b": (124, 108, 230), "beam": (163, 162, 157), "greedy": (120, 119, 115)}
+                 "gpt-oss-120b": (124, 108, 230), "beam": (163, 162, 157), "greedy": (120, 119, 115),
+                 "Intelif": (236, 236, 232)}
 
 
 def accent_for(name: str, i: int):

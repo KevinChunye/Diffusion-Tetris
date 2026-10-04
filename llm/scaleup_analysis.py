@@ -46,6 +46,14 @@ def _boot_mean(values_by_seed: pd.Series):
     return tuple(np.quantile(reps, [0.025, 0.975]))
 
 
+def _complete(st: pd.DataFrame, ep: pd.DataFrame):
+    """Drop games stopped by the budget guard (partly played or never started); they are reported, not analyzed."""
+    bad = ep[ep.get("stop_reason", pd.Series(index=ep.index, dtype=object)).fillna("").eq("budget")]
+    keys = set(zip(bad["arm"], bad["episode_seed"]))
+    keep_st = ~pd.Series([(a, s) in keys for a, s in zip(st["arm"], st["episode_seed"])], index=st.index)
+    return st[keep_st], ep[~ep.index.isin(bad.index)], bad[["arm", "episode_seed", "pieces_placed"]]
+
+
 def _spearman(x, y) -> float:
     return float(pd.Series(x).rank().corr(pd.Series(y).rank()))
 
@@ -55,6 +63,7 @@ def ladder(run_dir: str) -> dict:
     pricing = load_pricing("configs/pricing.yaml")
     ep = pd.read_csv(d / "episodes.csv")
     st = _usd(pd.read_csv(d / "steps.csv"), pricing)
+    st, ep, dropped = _complete(st, ep)
     per = st.groupby(["arm", "episode_seed"]).agg(decisions=("turn", "size"), usd_stated=("usd_stated", "sum"),
                                                    usd_full=("usd_full", "sum"), latency_p50=("latency_s", "median")).reset_index()
     ep = ep.merge(per, on=["arm", "episode_seed"], how="left")
@@ -85,7 +94,8 @@ def ladder(run_dir: str) -> dict:
             reps.append(_spearman(x.values, piv.loc[pick].mean().values))
         stats[name] = {"rho": point, "lo": float(np.quantile(reps, 0.025)), "hi": float(np.quantile(reps, 0.975))}
     s.to_csv(d / "summary_scaleup.csv", index=False)
-    out = {"arms": len(s), "seeds": len(seeds), "decisions": int(s["decisions"].sum()), "spearman_vs_score": stats}
+    out = {"arms": len(s), "seeds": len(seeds), "decisions": int(s["decisions"].sum()), "spearman_vs_score": stats,
+           "dropped_budget_games": dropped.to_dict("records")}
     (d / "analysis.json").write_text(json.dumps(out, indent=1))
     return out
 
@@ -95,6 +105,7 @@ def memory(run_dir: str) -> dict:
     pricing = load_pricing("configs/pricing.yaml")
     st = _usd(pd.read_csv(d / "steps.csv"), pricing)
     ep = pd.read_csv(d / "episodes.csv")
+    st, ep, dropped = _complete(st, ep)
     st["policy"] = st["arm"].str.split("/").str[1]
     st["mname"] = st["arm"].str.split("/").str[0]
     st["uncached"] = st["prompt_tokens"] - st["cached_tokens"].fillna(0)
@@ -121,18 +132,30 @@ def memory(run_dir: str) -> dict:
     for m, g in per.groupby("mname"):
         piv_r = g.pivot_table(index="episode_seed", columns="policy", values="regret")
         piv_u = g.pivot_table(index="episode_seed", columns="policy", values="uncached")
+        g = g.assign(c_st=g["usd_stated"] / g["decisions"], c_full=g["usd_full"] / g["decisions"])
+        piv_cs = g.pivot_table(index="episode_seed", columns="policy", values="c_st")
+        piv_cf = g.pivot_table(index="episode_seed", columns="policy", values="c_full")
         res = {}
         for name, piv, fn in (("regret_append_minus_stateless", piv_r, lambda p: (p["append"] - p["stateless"]).mean()),
                               ("regret_window8_minus_stateless", piv_r, lambda p: (p["window8"] - p["stateless"]).mean()),
-                              ("uncached_window8_over_append", piv_u, lambda p: p["window8"].mean() / p["append"].mean())):
-            p = piv.dropna()
+                              ("uncached_window8_over_append", piv_u, lambda p: p["window8"].mean() / p["append"].mean()),
+                              ("cost_append_over_stateless_stated", piv_cs, lambda p: p["append"].mean() / p["stateless"].mean()),
+                              ("cost_append_over_stateless_full", piv_cf, lambda p: p["append"].mean() / p["stateless"].mean())):
+            need = {"regret_append_minus_stateless": ["append", "stateless"], "regret_window8_minus_stateless": ["window8", "stateless"],
+                    "uncached_window8_over_append": ["window8", "append"],
+                    "cost_append_over_stateless_stated": ["append", "stateless"],
+                    "cost_append_over_stateless_full": ["append", "stateless"]}[name]
+            if not set(need) <= set(piv.columns):
+                continue
+            p = piv[need].dropna()
             if len(p) < 2:
                 continue
             reps = [fn(p.iloc[RNG.integers(0, len(p), len(p))]) for _ in range(B)]
             res[name] = {"point": float(fn(p)), "lo": float(np.quantile(reps, 0.025)), "hi": float(np.quantile(reps, 0.975)), "seeds": len(p)}
         paired[m] = res
     s.to_csv(d / "summary_scaleup.csv", index=False)
-    out = {"cells": len(s), "decisions": int(s["decisions"].sum()), "paired": paired}
+    out = {"cells": len(s), "decisions": int(s["decisions"].sum()), "paired": paired,
+           "dropped_budget_games": dropped.to_dict("records")}
     (d / "analysis.json").write_text(json.dumps(out, indent=1))
     return out
 
