@@ -22,3 +22,5 @@ iteration,label,cost_usd,n_calls,utc
 8,interference calibration (calibration_gemma),0.006041,4,2026-10-03T00:59:43Z
 8,interference live pilot (live_pilot_v2),0.659553,1570,2026-10-03T01:31:32Z
 9,capacity_sweep part 1 (stopped: overlapping high-load rounds; conservative incl. in-flight),0.85,1456,2026-10-04T06:14:01Z
+9,capacity_sweep_part2 (capacity_part2),3.595431,3884,2026-10-04T06:51:11Z
+9,capacity_sweep_part3 (capacity_part3),1.130432,186,2026-10-04T07:06:20Z
