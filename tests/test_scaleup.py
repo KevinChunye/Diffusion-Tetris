@@ -60,3 +60,18 @@ def test_capacity_sweep_budget_is_fail_closed(tmp_path):
     d = run(cfg, str(tmp_path / "cap"), client=CacheClient(), sleep=lambda s: None)
     spend = json.loads((d / "spend.json").read_text())
     assert spend["stopped"] == "budget" and spend["estimated_cost_usd"] <= 0.0005
+
+
+def test_capacity_sweep_resume_skips_done_rounds_and_adds_extra(tmp_path):
+    from llm.capacity_sweep import plan, run
+
+    base = {"iteration": 99, "name": "t", "history_turns": 2, "gap_s": 0, "cooldown_s": 0, "loads": [1, 2, 32],
+            "parallel_lanes": 2, "max_inflight": 64, "exclusive_load": 32, "seed": 1, "budget_usd": 1.0,
+            "models": [{"id": "m", "reps": 1}]}
+    d = run(base, str(tmp_path / "a"), client=CacheClient(capacity=64), sleep=lambda s: None)
+    first = [json.loads(l) for l in open(d / "rows.jsonl")]
+    resumed = dict(base, resume_from=str(d), models=[{"id": "m", "reps": 2}], extra=[{"model": "m", "rep": 100, "load": 2}])
+    rounds = plan(resumed)[0]["rounds"]
+    done = {(r["rep"], r["load"]) for r in first}
+    assert all((r["rep"], r["load"]) not in done for r in rounds)
+    assert {(r["rep"], r["load"]) for r in rounds} == {(1, 1), (1, 2), (1, 32), (100, 2)}

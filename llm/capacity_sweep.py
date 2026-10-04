@@ -48,16 +48,25 @@ def round_reservation(price: Dict, prefix_tokens: int, n: int) -> float:
 
 
 def plan(cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Per model: reps x shuffled N order (seeded, recorded)."""
+    """Per model: reps x shuffled N order (seeded, recorded). With `resume_from`, rounds already completed
+    in that run directory are skipped; `extra` appends rounds (e.g. repeats of rounds that were confounded)."""
     rng = random.Random(int(cfg.get("seed", 0)))
+    done = set()
+    if cfg.get("resume_from"):
+        for line in open(Path(cfg["resume_from"]) / "rows.jsonl", encoding="utf-8"):
+            r = json.loads(line)
+            done.add((r["model"], r["rep"], r["load"]))
     lanes = []
     for m in cfg["models"]:
         rounds = []
         for rep in range(int(m["reps"])):
             ns = [n for n in cfg["loads"] if n <= int(m.get("max_load", max(cfg["loads"])))]
             rng.shuffle(ns)
-            rounds += [{"model": m["id"], "rep": rep, "load": n} for n in ns]
-        lanes.append({"model": m["id"], "rounds": rounds})
+            rounds += [{"model": m["id"], "rep": rep, "load": n} for n in ns if (m["id"], rep, n) not in done]
+        rounds += [{"model": m["id"], "rep": int(e["rep"]), "load": int(e["load"])} for e in cfg.get("extra", [])
+                   if e["model"] == m["id"]]
+        if rounds:
+            lanes.append({"model": m["id"], "rounds": rounds})
     return lanes
 
 
@@ -84,6 +93,10 @@ def run(cfg: Dict[str, Any], out: str, client=None, sleep=time.sleep) -> Path:
     settings = load_model_settings()
     cap = float(cfg["budget_usd"]) if mock else min(float(cfg["budget_usd"]), TOTAL_BUDGET_USD - spent_so_far())
     gate = threading.Semaphore(int(cfg.get("max_inflight", 64)))
+    # Rounds at or above `exclusive_load` never overlap each other, so one model's high-load round cannot
+    # trip a shared gateway or account limit while another model is being measured.
+    big_lock = threading.Lock()
+    exclusive = int(cfg.get("exclusive_load", 10**9))
     lock = threading.Lock()
     state = {"spent": 0.0, "reserved": 0.0, "stopped": "", "calls": 0}
     est_prefix = int(len(json.dumps(past).encode()) / 2.4) + 800
@@ -124,8 +137,15 @@ def run(cfg: Dict[str, Any], out: str, client=None, sleep=time.sleep) -> Path:
                     return
                 state["reserved"] += reserve
             results: List[Dict[str, Any]] = []
-            with ThreadPoolExecutor(max_workers=rnd["load"]) as ex:
-                list(ex.map(lambda k: agent(spec["model"], rnd, k, results), range(rnd["load"])))
+            big = big_lock if rnd["load"] >= exclusive else None
+            if big:
+                big.acquire()
+            try:
+                with ThreadPoolExecutor(max_workers=rnd["load"]) as ex:
+                    list(ex.map(lambda k: agent(spec["model"], rnd, k, results), range(rnd["load"])))
+            finally:
+                if big:
+                    big.release()
             spent = 0.0
             for r in results:
                 w_cost, p_cost = r["cost_usd"]

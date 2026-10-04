@@ -1,0 +1,774 @@
+{
+ "live": true,
+ "mock": false,
+ "git_commit": "afa7f70499f52d823898bb549636ac25b3bbf946",
+ "started_utc": "2026-10-04T06:01:27Z",
+ "config_sha256": "c9850dd4e9c954be0f6653e7efff926fdc6b91024511417ed74371b49c62079b",
+ "plan": [
+  {
+   "model": "openai/gpt-oss-20b",
+   "rounds": [
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 1,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 2,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 3,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-20b",
+     "rep": 4,
+     "load": 2
+    }
+   ]
+  },
+  {
+   "model": "deepseek-ai/DeepSeek-V4-Flash",
+   "rounds": [
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 0,
+     "load": 64
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 4
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 16
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 64
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 1
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 8
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 2
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 1,
+     "load": 32
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 2
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 16
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 64
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 1
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 32
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 4
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 2,
+     "load": 8
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 2
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 4
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 32
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 16
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 64
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 1
+    },
+    {
+     "model": "deepseek-ai/DeepSeek-V4-Flash",
+     "rep": 3,
+     "load": 8
+    }
+   ]
+  },
+  {
+   "model": "openai/gpt-oss-120b",
+   "rounds": [
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 16
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 1,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 8
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 2
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 4
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 32
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 64
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 1
+    },
+    {
+     "model": "openai/gpt-oss-120b",
+     "rep": 2,
+     "load": 16
+    }
+   ]
+  },
+  {
+   "model": "google/gemma-4-31B-it",
+   "rounds": [
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 64
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 8
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 4
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 64
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 2
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 16
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 1
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 1,
+     "load": 32
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 64
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 8
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 32
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 2
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 16
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 4
+    },
+    {
+     "model": "google/gemma-4-31B-it",
+     "rep": 2,
+     "load": 1
+    }
+   ]
+  },
+  {
+   "model": "MiniMaxAI/MiniMax-M2.5",
+   "rounds": [
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 64
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 8
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 32
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 4
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 1
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 16
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 64
+    },
+    {
+     "model": "MiniMaxAI/MiniMax-M2.5",
+     "rep": 1,
+     "load": 2
+    }
+   ]
+  },
+  {
+   "model": "Qwen/Qwen3.8-27B-FP8",
+   "rounds": [
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "Qwen/Qwen3.8-27B-FP8",
+     "rep": 0,
+     "load": 64
+    }
+   ]
+  },
+  {
+   "model": "moonshotai/Kimi-K2.7-Code",
+   "rounds": [
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 64
+    }
+   ]
+  },
+  {
+   "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+   "rounds": [
+    {
+     "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+     "rep": 0,
+     "load": 32
+    },
+    {
+     "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+     "rep": 0,
+     "load": 1
+    },
+    {
+     "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+     "rep": 0,
+     "load": 2
+    }
+   ]
+  },
+  {
+   "model": "lukealonso/GLM-5.2-NVFP4",
+   "rounds": [
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 2
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 1
+    }
+   ]
+  }
+ ]
+}
