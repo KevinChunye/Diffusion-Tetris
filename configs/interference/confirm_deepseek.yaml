@@ -1,0 +1,89 @@
+# E4 (iteration 12), deepseek-ai/DeepSeek-V4-Flash only: same design as confirm.yaml; the two models run as parallel processes,
+# each capped at half of E4's $2.6 budget.
+name: interference_confirm_deepseek
+iteration: 12
+corpus: runs/explore/interference/corpus_heldout
+budget_usd: 1.3
+client:
+  max_retries: 0
+  timeout_s: 60
+trace:
+  duration_s: 40
+  rate_short: 1.0
+  rate_long: 0.15
+  ping_every_s: 2.0
+blocks: 13
+block_seed_base: 900
+cooldown_s: 8
+max_waiting: 200
+max_wall_s: 150
+defaults:
+  temperature: 0
+  response_format:
+    type: json_object
+models:
+  deepseek-ai/DeepSeek-V4-Flash:
+    chat_kwargs:
+      reasoning_effort: null
+    max_tokens_short: 64
+    max_tokens_long: 64
+conditions:
+  short_only:
+    policy: fifo
+    concurrency: 8
+    kinds:
+    - short
+    - ping
+  fifo:
+    policy: fifo
+    concurrency: 8
+  fifo_prio:
+    policy: fifo
+    concurrency: 8
+    priority_hints:
+      short: 0
+      long: 10
+  defer_long:
+    policy: defer_long
+    concurrency: 8
+    max_long_inflight: 1
+    max_defer_s: 6.0
+analysis:
+  slo_s: 2.5
+  h1:
+    treatment: fifo
+    control: short_only
+  h2:
+    treatment: defer_long
+    control: fifo
+    min_p95_reduction: 0.2
+  b2:
+    treatment: fifo_prio
+    control: fifo
+  noninferiority:
+    legal_rate_pp: 2.0
+    regret: 0.15
+    useful_rate_rel: 0.05
+  bootstrap:
+    n: 2000
+    seed: 0
+calibration:
+  n_short: 2
+  n_long: 2
+  seed: 5
+sim:
+  bytes_per_token: 3.2
+  output_tokens:
+    short: 12
+    long: 12
+  profiles:
+    serialized_prefill:
+      replicas: 1
+      step_tokens: 8192
+      prefill_tok_s: 5000
+      rtt_s: 0.35
+    wide_fast:
+      replicas: 4
+      step_tokens: 2048
+      prefill_tok_s: 40000
+      rtt_s: 0.35

@@ -1,0 +1,22 @@
+# E1 (iteration 10): model ladder at scale. Same 9 configurations as iteration 6, 10 new seeds.
+# Stateless memory, annotated prompts, output constrained to legal placements (json_schema).
+iteration: 10
+name: ladder_scaleup
+model: openai/gpt-oss-20b
+seeds: [5000, 5001, 5002, 5003, 5004, 5005, 5006, 5007, 5008, 5009]
+max_pieces: 100
+budget_usd: 3.3
+concurrency: 6
+client: {max_retries: 3}
+oracle: {n_samples: 2, depth: 4, beam_h: 2, beam_w: 4, beam_samples: 1}
+defaults: {history: stateless, annotated: true, layout: static_first, response_format: json_schema, max_tokens: 32}
+arms:
+  gpt-oss-20b/low:          {model: openai/gpt-oss-20b, max_tokens: 1024}
+  gpt-oss-120b/low:         {model: openai/gpt-oss-120b, max_tokens: 1024}
+  gpt-oss-120b/medium:      {model: openai/gpt-oss-120b, max_tokens: 4096, chat_kwargs: {reasoning_effort: medium}}
+  gemma-4-31B/direct:       {model: google/gemma-4-31B-it}
+  DeepSeek-V4-Flash/direct: {model: deepseek-ai/DeepSeek-V4-Flash}
+  Qwen3.8-27B/direct:       {model: Qwen/Qwen3.8-27B-FP8}
+  Qwen3.5-397B/direct:      {model: Qwen/Qwen3.5-397B-A17B-FP8}
+  Kimi-K2.7/direct:         {model: moonshotai/Kimi-K2.7-Code, chat_kwargs: {reasoning_effort: null, extra_body: {chat_template_kwargs: {enable_thinking: false}}}}
+  GLM-5.2/direct:           {model: lukealonso/GLM-5.2-NVFP4}
