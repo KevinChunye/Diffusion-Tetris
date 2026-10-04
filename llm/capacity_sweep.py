@@ -159,7 +159,8 @@ def run(cfg: Dict[str, Any], out: str, client=None, sleep=time.sleep) -> Path:
                 with open(d / "rows.jsonl", "a", encoding="utf-8") as f:
                     for r in results:
                         f.write(json.dumps(r, default=str) + "\n")
-                hits = sum(1 for r in results if r["probe_prompt_tokens"] and r["probe_cached_tokens"] >= 0.5 * r["warm_prompt_tokens"])
+                hits = sum(1 for r in results if r["warm_ok"] and r["probe_ok"] and r["warm_prompt_tokens"]
+                           and r["probe_cached_tokens"] >= 0.5 * r["warm_prompt_tokens"])
                 errs = sum(1 for r in results if not (r["warm_ok"] and r["probe_ok"]))
                 print(f"[capacity] {spec['model'].split('/')[-1]:>20s} rep {rnd['rep']} N={rnd['load']:>2d}: "
                       f"reported hits {hits}/{len(results)} errors {errs} spent ${state['spent']:.3f}", flush=True)

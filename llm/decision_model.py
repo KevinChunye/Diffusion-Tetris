@@ -127,6 +127,54 @@ def play(model, seed: int, pieces: int, arm: str, calls_log: Path = None) -> Tup
     return rows, ep
 
 
+def quantize_int8(model) -> None:
+    """Dynamic int8 weights for every Linear layer of the base model (fp32 activations), for CPUs with int8
+    dot-product instructions but no native bf16. Converted layer by layer to keep peak memory near the
+    bf16 model's size. The 1-output scorer head stays in fp32."""
+    import torch
+    from torch import nn
+    from torch.ao.nn.quantized.dynamic import Linear as QLinear
+    from torch.ao.quantization import default_dynamic_qconfig
+
+    import gc
+
+    net = model.network
+    parents = [m for m in net.base_model.modules() if type(m) is not nn.Linear]  # hold no Linear references
+    for parent in parents:
+        for name in [n for n, c in parent.named_children() if type(c) is nn.Linear]:
+            child = getattr(parent, name)
+            child.float()
+            child.qconfig = default_dynamic_qconfig
+            setattr(parent, name, QLinear.from_float(child))
+            del child
+        gc.collect()
+    net.float()
+    torch.set_grad_enabled(False)
+
+
+def compute_fp32(model) -> None:
+    """Keep the bf16 weights but compute in fp32: each Linear upcasts its weight per call, all other
+    parameters are converted once. Same weights as bf16, higher arithmetic precision; on CPUs without
+    native bf16 this is faster than bf16 matmuls."""
+    import types
+
+    import torch
+    import torch.nn.functional as F
+    from torch import nn
+
+    def fwd(self, x):
+        return F.linear(x, self.weight.float(), None if self.bias is None else self.bias.float())
+
+    net = model.network
+    for m in net.modules():
+        if type(m) is nn.Linear and m is not net.scorer:
+            m.forward = types.MethodType(fwd, m)
+        else:
+            for p in m.parameters(recurse=False):
+                p.data = p.data.float()
+    torch.set_grad_enabled(False)
+
+
 def main() -> None:
     import pandas as pd
     import torch
@@ -136,24 +184,36 @@ def main() -> None:
     ap.add_argument("--seeds", required=True)
     ap.add_argument("--pieces", type=int, default=100)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--dtype", default="bfloat16")
+    ap.add_argument("--dtype", default="bfloat16", help="bfloat16, fp32compute (bf16 weights, fp32 arithmetic), or int8 (dynamic int8 Linear weights)")
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--stop_after_utc", default="", help="HH:MM; start no new game after this time (UTC, today)")
+    ap.add_argument("--base_dir", default="", help="local folder with the base model's *.safetensors (pinned revision)")
     args = ap.parse_args()
     out = Path(args.out)
     if any((out / f).exists() for f in ("steps.csv", "calls.jsonl", "manifest.json")):
         raise FileExistsError(f"fresh directory required: {out}")
     out.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(args.threads)
+    if args.base_dir:  # use base weights fetched ahead of time instead of the Hugging Face cache
+        import huggingface_hub
+        huggingface_hub.snapshot_download = lambda *a, **k: args.base_dir
     t_load = time.perf_counter()
-    model = Intelif.from_pretrained(device="cpu", dtype=args.dtype)
+    model = Intelif.from_pretrained(device="cpu", dtype="bfloat16" if args.dtype in ("int8", "fp32compute") else args.dtype)
+    if args.dtype == "int8":
+        quantize_int8(model)
+    elif args.dtype == "fp32compute":
+        compute_fp32(model)
     load_s = time.perf_counter() - t_load
     manifest = {"model": "UserMoonlight/intelif-qwen3-4b", "revision": "v0.1", "device": "cpu", "dtype": args.dtype,
-                "threads": args.threads, "cpu": platform.processor() or platform.machine(), "torch": torch.__version__,
+                "threads": args.threads, "base_dir": args.base_dir, "cpu": platform.processor() or platform.machine(), "torch": torch.__version__,
                 "load_s": load_s, "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-                "seeds": args.seeds, "pieces": args.pieces, "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+                "seeds": args.seeds, "pieces": args.pieces, "stop_after_utc": args.stop_after_utc, "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1))
     eps = []
     for seed in [int(s) for s in args.seeds.split(",")]:
+        if args.stop_after_utc and time.strftime("%H:%M", time.gmtime()) >= args.stop_after_utc:
+            print(f"[intelif] {args.stop_after_utc} UTC reached; no new games started", flush=True)
+            break
         rows, ep = play(model, seed, args.pieces, "intelif-qwen3-4b/decision", out / "calls.jsonl")
         pd.DataFrame(rows).to_csv(out / "steps.csv", mode="a", header=not (out / "steps.csv").exists(), index=False)
         eps.append(ep)

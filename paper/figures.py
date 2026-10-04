@@ -2,7 +2,7 @@
 
     python paper/figures.py          # writes paper/figures/*.svg and paper/figures/facts.json
 
-Each figure is drawn at its printed size (6.5 in wide) so text prints at the same point size in
+Each figure is drawn at its printed size (5.5 in wide, the ICLR text width) so text prints at the same point size in
 every figure. Colors follow the entity (one color per model across the whole paper) and come from
 a palette validated for color-vision deficiency; identity is always also given by a direct label.
 """
@@ -27,7 +27,11 @@ OUT = Path(__file__).resolve().parent / "figures"
 INK, INK2, MUTED, GRID = "#0b0b0b", "#52514e", "#a3a29d", "#e6e5e1"
 MODEL = {"gemma-4-31B": "#2a78d6", "DeepSeek-V4-Flash": "#eb6834", "gpt-oss-20b": "#1baf7a", "gpt-oss-120b": "#4a3aa7"}
 COND = {"alone": "#eda100", "fifo": "#e34948", "defer_long": "#4a3aa7"}
-W = 6.5  # printed text width, inches
+W = 5.5  # printed text width, inches
+SHORT = {"openai/gpt-oss-20b": "gpt-oss-20b", "openai/gpt-oss-120b": "gpt-oss-120b", "google/gemma-4-31B-it": "gemma-4-31B",
+         "deepseek-ai/DeepSeek-V4-Flash": "DeepSeek-V4-Flash", "MiniMaxAI/MiniMax-M2.5": "MiniMax-M2.5",
+         "Qwen/Qwen3.8-27B-FP8": "Qwen3.8-27B", "Qwen/Qwen3.5-397B-A17B-FP8": "Qwen3.5-397B",
+         "moonshotai/Kimi-K2.7-Code": "Kimi-K2.7", "lukealonso/GLM-5.2-NVFP4": "GLM-5.2"}
 
 from matplotlib import font_manager  # noqa: E402
 
@@ -272,6 +276,121 @@ def fig_interference() -> None:
     FACTS["interference"] = summ[keep].replace([np.inf], "inf").round(4).to_dict("records")
     FACTS["overlap"] = ov.round(3).to_dict("records")
     FACTS["verdicts"] = json.loads((d / "verdicts.json").read_text())["verdicts"]
+
+
+# ---- Figures: how many agent contexts a deployment keeps warm (E3 capacity sweep) ---------------
+
+CAP_DIRS = [RUNS / "scaleup" / "capacity", RUNS / "scaleup" / "capacity_part2"]
+
+
+def _capacity_data():
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from llm.capacity_analysis import capacity, load, summarize
+    from llm.model_arch import PARAMS_B, kv_bytes
+
+    raw = load(CAP_DIRS)
+    df = raw[~raw["contended"]]
+    s = summarize(df)
+    s["err_rate"] = s["errors"] / s["agents"]
+    c = capacity(s)
+    ctx = float(df["warm_prompt_tokens"].median())
+    c["kv_mb_per_ctx"] = [kv_bytes(m, int(ctx)) / 2**20 for m in c["model"]]
+    c["active_b"] = [PARAMS_B[m][1] for m in c["model"]]
+    return raw, df, s, c, ctx
+
+
+def fig_capacity_all() -> None:
+    """Appendix: every model, warm-reuse rate and refusals against concurrent agents."""
+    raw, df, s, c, ctx = _capacity_data()
+    order = c.sort_values(["capacity", "cold_p50_s"], ascending=[False, True])["model"].tolist()
+    fig, axes = plt.subplots(3, 3, figsize=(W, 4.6), sharex=True, sharey=True, gridspec_kw={"hspace": 0.55, "wspace": 0.12})
+    for ax, m in zip(axes.flat, order):
+        g = s[s["model"] == m].sort_values("load")
+        ax.fill_between(g["load"], g["hit_lo"] * 100, g["hit_hi"] * 100, color=GRID, lw=0, zorder=1)
+        ax.plot(g["load"], g["hit_rate"] * 100, color=INK, lw=1.6, zorder=3)
+        ax.plot(g["load"], g["hit_rate"] * 100, "o", ms=3.5, color=INK, zorder=3)
+        if g["errors"].sum():
+            ax.plot(g["load"], g["err_rate"] * 100, color=COND["fifo"], lw=1.2, ls=(0, (3, 2)), zorder=2)
+        cc = c[c["model"] == m].iloc[0]
+        basis = "" if g["hit_basis"].iloc[0] == "reported" else " (hits from latency)"
+        ax.set_title(f"{SHORT[m]}{basis}", fontsize=8, pad=4)
+        cap = f"keeps {cc['capacity']}" + ("+" if cc["censored"] else "")
+        ax.text(0.04, 0.08, cap, transform=ax.transAxes, ha="left", va="bottom", fontsize=7, color=INK2)
+    for ax in axes.flat[len(order):]:
+        ax.set_visible(False)
+    for ax in axes.flat:
+        ax.set_xscale("log", base=2)
+        ax.set_xticks([1, 4, 16, 64])
+        ax.set_xticklabels(["1", "4", "16", "64"])
+        ax.set_ylim(-5, 108)
+        ax.set_yticks([0, 50, 100])
+        ax.set_yticklabels(["0%", "50%", "100%"])
+    for ax in axes[-1]:
+        ax.set_xlabel("concurrent agents (N)")
+    fig.legend([plt.Line2D([], [], color=INK, lw=1.6, marker="o", ms=3.5),
+                plt.Line2D([], [], color=COND["fifo"], lw=1.2, ls=(0, (3, 2)))],
+               ["contexts still cached after 30 s idle (95% CI band)", "requests refused (429)"],
+               loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.9), handlelength=2.2)
+    _save(fig, "capacity_all")
+    FACTS["capacity_summary"] = s.round(4).to_dict("records")
+    FACTS["capacity_table"] = c.round(3).to_dict("records")
+    FACTS["capacity_context_tokens"] = ctx
+    FACTS["capacity_agents"] = {"kept": int(len(df)), "excluded_contended": int(raw["contended"].sum()),
+                                "calls_total": int(2 * len(raw))}
+
+
+
+CAP_MAIN = ["openai/gpt-oss-20b", "google/gemma-4-31B-it", "deepseek-ai/DeepSeek-V4-Flash"]  # chosen after viewing all
+
+
+def fig_capacity() -> None:
+    """Main text: the models whose curves show the pattern clearly, plus capacity against KV size for all."""
+    raw, df, s, c, ctx = _capacity_data()
+    fig = plt.figure(figsize=(W, 2.35))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 1.05], wspace=0.55)
+    ax, ax2, ax3 = (fig.add_subplot(gs[i]) for i in range(3))
+    for m in CAP_MAIN:
+        g = s[s["model"] == m].sort_values("load")
+        col = MODEL[SHORT[m]]
+        ax.plot(g["load"], g["hit_rate"] * 100, color=col, lw=2)
+        ax2.plot(g["load"], g["prefill_tok_per_s"] / 1000, color=col, lw=2)
+        for x, y, z in zip(g["load"], g["hit_rate"] * 100, g["prefill_tok_per_s"] / 1000):
+            _dot(ax, x, y, col, size=5.5)
+            _dot(ax2, x, z, col, size=5.5)
+    for a in (ax, ax2):
+        a.set_xscale("log", base=2)
+        a.set_xticks([1, 4, 16, 64])
+        a.set_xticklabels(["1", "4", "16", "64"])
+        a.set_xlabel("concurrent agents (N)")
+    ax.set_ylim(-6, 110)
+    ax.set_yticks([0, 50, 100])
+    ax.set_yticklabels(["0%", "50%", "100%"])
+    ax.set_title("a  Still cached after 30 s", pad=7)
+    ax2.set_title("b  Prefill throughput", pad=7)
+    ax2.set_ylabel("thousand tokens / s")
+    for m in CAP_MAIN:
+        g = s[s["model"] == m].sort_values("load")
+        ax2.text(70, g["prefill_tok_per_s"].iloc[-1] / 1000, SHORT[m], fontsize=7, color=INK, va="center", ha="left")
+    ax2.set_xlim(0.8, 64 * 1.15)
+    # (c) capacity against KV memory one context needs, all models
+    for _, r in c.iterrows():
+        name = SHORT[r["model"]]
+        col = MODEL.get(name, MUTED)
+        _dot(ax3, r["kv_mb_per_ctx"], r["capacity"], col, size=6)
+        if r["censored"]:
+            ax3.annotate("", xy=(r["kv_mb_per_ctx"], r["capacity"] * 1.6), xytext=(r["kv_mb_per_ctx"], r["capacity"] * 1.08),
+                         arrowprops=dict(arrowstyle="-|>", color=col, lw=1, mutation_scale=6))
+        ax3.text(r["kv_mb_per_ctx"] * 1.12, r["capacity"], name, fontsize=6.5, color=INK2, va="center")
+    ax3.set_xscale("log")
+    ax3.set_yscale("log", base=2)
+    ax3.set_yticks([1, 4, 16, 64])
+    ax3.set_yticklabels(["1", "4", "16", "64"])
+    ax3.set_xlabel(f"est. KV cache per {ctx / 1000:.1f}k context, MB")
+    ax3.set_ylabel("contexts kept warm")
+    ax3.set_title("c  Capacity vs KV size", pad=7)
+    _save(fig, "capacity")
+
 
 
 def main() -> None:

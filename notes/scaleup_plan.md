@@ -49,3 +49,25 @@ Run order, so that our own traffic never contaminates a cache or latency measure
 - E3 uses 6.6k-token contexts (pilot: 15k) so that 64 concurrent agents fit the budget.
 - The provider's other traffic is unobserved. Each experiment records start and end times.
 - Any deviation from this plan is recorded in the paper's appendix.
+
+## Addendum (2026-10-04, 06:45 UTC, before any analysis of E3 part 2, E1, E2, E4 or E5 data)
+
+- **Cost under the provider's stated policy.** The pricing page and a May 2026 blog state that cached
+  input is free on every serverless model, although four model cards show no cached row (see
+  `notes/model_architectures.md`). E2 therefore reports cost two ways: the stated policy (cached input
+  $0 everywhere; primary) and a full-price upper bound (cached input billed at the input price where no
+  cached price is listed). The E2 expectation "above 5 for models without a cached price" applies only
+  to the upper bound.
+- **E3 contended rounds.** Part 1 was stopped because rounds with N ≥ 32 of different models overlapped
+  and drew gateway-wide 429s. Part 2 never runs two N ≥ 32 rounds at once. In the analysis, any round
+  that was in flight while two N ≥ 32 rounds overlapped is excluded from both parts, and the count is
+  reported. Hit rate counts an agent as warm only if its warm-up and probe both succeeded; refusals are
+  reported separately.
+- **E5 (decision model).** Intelif (open, Qwen3-4B + LoRA + linear scorer, Jev-compatible request
+  format) is self-hosted on the container's 4-core CPU (no GPU). Each legal placement is one option,
+  described by its simulated outcome. Precision: bf16 weights with fp32 arithmetic. On three positions
+  it chose the same move as bf16 with confidences within 0.003, and was 3× faster. Dynamic int8 was
+  7× faster but changed the first move and flattened the distribution, so it is not used. Seeds are
+  played in a fixed order (1000–1002, then 5000–5009, the E1 seeds) and no new game starts after
+  11:45 UTC. Analyses: score relative to the beam-search bot, per-move oracle regret, CPU latency per
+  decision against input tokens, and whether the top option's probability tracks regret.
