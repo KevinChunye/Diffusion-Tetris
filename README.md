@@ -7,6 +7,20 @@ Case Study: Tetris
 
 ---
 
+## What is in this repository
+
+The repository holds two studies that share one Tetris engine (`TetrisGame_updated.py`, `TetrisGym_updated.py`).
+
+| | Where to look |
+|:--|:--|
+| **Diffusion-MPC in discrete domains** (the paper above) | `diffusion/`, `experiments/`, `configs/`, `train*.py`, [Quick Start](#quick-start) |
+| **Evaluating Agents as Served, Not as Weights** (open-weight and decision-model agents on a serverless API and a CPU) | paper: [`paper/paper.pdf`](paper/paper.pdf) (LaTeX source in `paper/latex/`); code: `llm/`, `harness/`; raw logs: [`runs/explore/`](runs/explore/README.md) |
+| Animations of the agents playing identical games | [`gallery/`](gallery/README.md) |
+| Running the hosted Jev decision model on the same games (Docker or plain Python, laptop-sized) | [`deploy/jev/`](deploy/jev/README.md) |
+| Plans, deviation logs, design notes | [`notes/`](notes/README.md) |
+
+---
+
 ## Overview
 
 This repository provides a **complete implementation of diffusion-based planning in discrete domains**, using Tetris as a case study.
@@ -61,7 +75,9 @@ GIFs use the gym's colored renderer (`tetris_render.py`, opt in with `TetrisGym(
 Comparison GIFs keep every board on the same piece and verify, at every move, that all agents face
 the same current and next piece. Use `--style classic` for the old matplotlib frames.
 
-![Four agents, same game](runs/explore/iter06/four_agents_seed1001_piece30.png)
+![Five agents, same game](gallery/same_game_seed1002_piece60.png)
+
+More animations, with the scores behind them, are in [`gallery/`](gallery/README.md).
 
 ```bash
 # four agents on one logged game (iteration 6, seed 1001): three LLMs replayed exactly + beam bot live
@@ -91,8 +107,9 @@ LLM bots need `TENSORMESH_API_KEY` in the environment; add `--mock` to run them 
 
 ## Serverless LLM exploration (Tensormesh, KV-cache reuse)
 
-**Paper draft:** [Not Just the Weights: What Tetris Reveals About Serving Open-Weight Agents](paper/paper.pdf)
-([source](paper/paper.html); `python paper/build.py` rebuilds every figure from `runs/explore/` and the PDF).
+**Paper:** [Evaluating Agents as Served, Not as Weights](paper/paper.pdf)
+([LaTeX source](paper/latex/main.tex); `python paper/build.py` rebuilds every figure from `runs/explore/` and the PDF,
+using pdflatex and bibtex).
 
 For the proposed open-weight Tetris benchmark, see the
 [research protocol and experiment plan](notes/tetris_benchmark_protocol.md) and
@@ -111,7 +128,7 @@ dense per-step regret as the quality signal. See `notes/tensormesh_probe.md` (pl
 decision requests on a hosted endpoint, and does client-side admission help? See
 [`notes/interference_study.md`](notes/interference_study.md) (results, with LIVE and SIMULATED evidence
 kept separate) and [`notes/interference_novelty_matrix.md`](notes/interference_novelty_matrix.md)
-(overlap audit and preregistration).
+(overlap audit and pre-specified hypotheses).
 
 ```bash
 python -m llm.interference_pilot sim  --config configs/interference/pilot_v2.yaml --out <fresh dir>   # SIMULATED

@@ -54,7 +54,7 @@ Commit `runs/explore/scaleup/jev/` (not `jev.env`) and push. Then, anywhere with
 
 ```bash
 python -m llm.scaleup_analysis decision runs/explore/scaleup/jev   # oracle regret and scores
-python paper/build.py                                              # the paper adds Jev to Figure 7 and Section 6.5
+python paper/build.py                                              # the paper adds Jev to Figure 6 and Section 6.5
 ```
 
 Latency measured this way includes your network round trip to TypeSafe, which is the latency an agent

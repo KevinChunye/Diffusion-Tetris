@@ -426,7 +426,7 @@ def fig_decision() -> None:
     it6 = pd.read_csv(RUNS / "iter06" / "episodes.csv")
     it6 = it6[it6["episode_seed"].isin(seeds)]
     it6_steps = pd.read_csv(RUNS / "iter06" / "steps.csv")
-    fig = plt.figure(figsize=(FULL, 2.15))
+    fig = plt.figure(figsize=(FULL, 2.0))
     gs = fig.add_gridspec(1, 4, width_ratios=[1.25, 0.62, 0.8, 0.85], wspace=0.5)
     ax, ax2, ax3 = fig.add_subplot(gs[0]), fig.add_subplot(gs[2]), fig.add_subplot(gs[3])
     # (a) where a decision is computed sets its latency: measured rows solid, vendor/author figures hollow

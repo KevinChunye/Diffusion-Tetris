@@ -64,3 +64,11 @@ deploy/jev/jev.env
 
 # The gallery's animations are part of the release
 !gallery/*.gif
+
+# LaTeX build products (paper/build.py copies the PDF to paper/paper.pdf)
+paper/latex/*.aux
+paper/latex/*.log
+paper/latex/*.bbl
+paper/latex/*.blg
+paper/latex/*.out
+paper/latex/main.pdf
