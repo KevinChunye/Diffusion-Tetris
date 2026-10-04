@@ -1,0 +1,1 @@
+[oracle] runs/explore/scaleup/memory: 4168 states in 4590s

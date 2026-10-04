@@ -238,12 +238,14 @@ def fig_memory2() -> None:
         if log:
             ax.set_yscale("log")
         for m in models:
-            g = s[s["model"] == m].set_index("policy").loc[order]
-            ax.plot(range(3), g[col], color=color[m], lw=1.8)
-            for i, v in enumerate(g[col]):
-                _dot(ax, i, v, color[m], size=5.5)
+            g = s[s["model"] == m].set_index("policy").reindex(order)
+            xs = [i for i, p in enumerate(order) if pd.notna(g.loc[p, col])]
+            ax.plot(xs, g[col].iloc[xs], color=color[m], lw=1.8)
+            for i in xs:
+                _dot(ax, i, g[col].iloc[i], color[m], size=5.5)
             if col == "usd_per_100_stated":
-                for i, (v, u) in enumerate(zip(g[col], g["usd_per_100_full"])):
+                for i in xs:
+                    v, u = g[col].iloc[i], g["usd_per_100_full"].iloc[i]
                     if u > v * 1.05:
                         ax.plot([i], [u], "o", ms=4.5, mfc="white", mec=color[m], mew=1.1, zorder=3)
         ax.set_xticks(range(3))
