@@ -6,6 +6,7 @@
 \usepackage{tabularx}
 \usepackage{multirow}
 \usepackage{float}
+\usepackage{capt-of}
 \usepackage{xurl}
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \usepackage{hyperref}
@@ -32,7 +33,13 @@
   \icmlaffiliation{mit}{Massachusetts Institute of Technology, Cambridge, MA, USA}
   \icmlcorrespondingauthor{Haochuan Wang}{hcw@mit.edu}
   \icmlkeywords{agents, LLM serving, decision models, evaluation, Tetris}
-  \vskip 0.3in
+  \vskip 0.22in
+  {\begin{center}
+    \includegraphics[width=0.9\textwidth]{teaser.png}
+    \captionof{figure}{\textbf{Same game, same pieces, five agents} (seed 1002, piece 60 of 100). Three open-weight language models served by Tensormesh and the Intelif decision model self-hosted on a CPU, replayed move by move from their logs, next to a beam-search bot, a classical planner that serves as the reference player (\cref{sec:method}). gpt-oss-20b and DeepSeek-V4-Flash have topped out; Intelif's stack is high, but it finishes all 100 pieces with 54 points, behind gemma-4-31B (76). Animations for more games are in the repository's \tsc{gallery/}.}
+    \label{fig:teaser}
+  \end{center}}
+  \vskip 0.15in
 ]
 
 \printAffiliationsAndNotice{}
@@ -40,13 +47,6 @@
 \begin{abstract}
 An agent meets a model as served: through an endpoint with a price card, a shared cache and other tenants, or on whatever hardware a self-hosted model runs. Benchmarks rank the weights. We measure what agents get from models as served, using Tetris as an exact instrument: every move is scored against an oracle and every agent receives the same pieces. In five pre-specified experiments with nine open-weight models on one serverless provider, plus an open decision model self-hosted on a CPU, we find that price and size do not predict decision quality; that resending history costs almost nothing when cached input is free, would cost eleven to twelve times more if it were not, and makes play worse; that deployments keep between 4 and more than 64 agent contexts warm, in line with their throughput rather than the model's KV-cache size; that an agent's own long requests slow its slowest short decisions more than tenfold, which a simple admission rule cuts by 59\% without hurting play; and that the decision model plays mid-pack but takes 27\,s per move on a CPU, about 650 times longer than reported on a GPU. Architecture predicts some of what an agent sees; the deployment sets the rest.
 \end{abstract}
-
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=0.92\textwidth]{teaser.png}
-  \caption{\textbf{Same game, same pieces, five agents} (seed 1002, piece 60 of 100). Three open-weight language models served by Tensormesh and the Intelif decision model self-hosted on a CPU, replayed move by move from their logs, next to a beam-search bot, a classical planner that serves as the reference player (\cref{sec:method}). gpt-oss-20b and DeepSeek-V4-Flash have topped out; Intelif's stack is high, but it finishes all 100 pieces with 54 points, behind gemma-4-31B (76). Animations for more games are in the repository's \tsc{gallery/}.}
-  \label{fig:teaser}
-\end{figure*}
 
 \section{Introduction}
 
