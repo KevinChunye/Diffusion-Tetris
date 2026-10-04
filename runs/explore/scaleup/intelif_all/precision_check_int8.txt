@@ -1,0 +1,6 @@
+/home/user/intelif-venv/lib/python3.12/site-packages/torch/ao/nn/quantized/modules/utils.py:72: UserWarning: torch.quantize_per_tensor, torch.quantize_per_channel and other quantized tensor creation functions that produce tensors with dtype torch.quint8, torch.qint8, and torch.qint32 are deprecated and will be removed in a future PyTorch release. Please see https://github.com/pytorch/pytorch/issues/184982 for more information. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/quantized/Quantizer.cpp:111.)
+  qweight = torch.quantize_per_tensor(
+load+quant 149.9850554909999 maxrss GB 13.616424
+0 34 options 1179 tokens 10.97 s [('rotation 3, column 4', 0.059), ('rotation 2, column 1', 0.054), ('rotation 0, column 2', 0.048)]
+1 9 options 375 tokens 2.74 s [('rotation 0, column 6', 0.171), ('rotation 0, column 2', 0.165), ('rotation 0, column 0', 0.116)]
+2 17 options 636 tokens 4.63 s [('rotation 0, column 7', 0.183), ('rotation 1, column 8', 0.095), ('rotation 1, column 0', 0.081)]

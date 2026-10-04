@@ -1,0 +1,4 @@
+load+quant 48.48680728399995 maxrss GB 10.041176
+0 34 options 1179 tokens 26.54 s [('rotation 0, column 4', 0.133), ('rotation 0, column 3', 0.099), ('rotation 0, column 2', 0.087)]
+1 9 options 379 tokens 9.08 s [('rotation 0, column 7', 0.186), ('rotation 0, column 2', 0.168), ('rotation 0, column 8', 0.136)]
+2 17 options 644 tokens 14.64 s [('rotation 1, column 3', 0.117), ('rotation 0, column 0', 0.112), ('rotation 0, column 1', 0.086)]

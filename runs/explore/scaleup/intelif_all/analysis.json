@@ -1,0 +1,11 @@
+{
+ "episodes": 3,
+ "decisions": 239,
+ "norm_score": 0.4126984126984127,
+ "norm_score_mean_of_ratios": 0.41186035389765663,
+ "top1_beam": 0.3263598326359833,
+ "regret_beam": 1.2786192468619246,
+ "latency_p50_s": 30.990714855999613,
+ "input_tokens_mean": 813.7280334728033,
+ "legal_rate": 1.0
+}
