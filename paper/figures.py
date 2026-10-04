@@ -206,16 +206,27 @@ def fig_cache() -> None:
 
 # ---- Figure: your own long requests slow your short ones (iteration 8 live pilot) ----------------
 
+INTERF_DIRS = [Path(x) for x in os.environ.get("INTERF_DIRS", "").split(",") if x] or \
+    [RUNS / "interference" / "confirm_gemma", RUNS / "interference" / "confirm_deepseek"]
+
+
+def _interf_load(dirs):
+    rows, summ, ov, verdicts = [], [], [], {}
+    for d in dirs:
+        rows.append(pd.DataFrame([json.loads(l) for l in open(d / "requests.jsonl", encoding="utf-8")]))
+        summ.append(pd.read_csv(d / "summary.csv"))
+        ov.append(pd.read_csv(d / "overlap.csv"))
+        verdicts[d.name] = json.loads((d / "verdicts.json").read_text())["verdicts"]
+    return pd.concat(rows, ignore_index=True), pd.concat(summ, ignore_index=True), pd.concat(ov, ignore_index=True), verdicts
+
+
 def fig_interference() -> None:
-    d = RUNS / "interference" / "live_pilot_v2"
-    rows = pd.DataFrame([json.loads(l) for l in open(d / "requests.jsonl", encoding="utf-8")])
+    rows, summ, ov, verdicts = _interf_load(INTERF_DIRS)
     dec = rows[rows["kind"] == "short"].copy()
     valid = dec["status"].eq("ok") & dec["valid_action_s"].notna()
     dec["ttva"] = np.where(valid, dec["valid_action_s"] - dec["arrival_s"], np.inf)
-    summ = pd.read_csv(d / "summary.csv")
-    ov = pd.read_csv(d / "overlap.csv")
-    fig = plt.figure(figsize=(W, 2.75))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1.15, 0.95], wspace=0.6)
+    fig = plt.figure(figsize=(W, 2.4))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1.15, 0.95], wspace=0.62)
     ax = fig.add_subplot(gs[0])
     g = dec[dec["model"] == "google/gemma-4-31B-it"]
     names = {"short_only": ("alone", COND["alone"]), "fifo": ("FIFO", COND["fifo"]),
@@ -234,11 +245,11 @@ def fig_interference() -> None:
     ax.set_yticks([0, 0.5, 1])
     ax.set_yticklabels(["0%", "50%", "100%"])
     ax.set_xlabel("time to a valid move, s (log)")
-    ax.set_title("a  Short moves, gemma-4-31B", pad=8)
+    ax.set_title("a  Time to a move (gemma)", pad=8)
     ax.legend(loc="lower right", handlelength=1.4, borderaxespad=0.1)
 
     ax2 = fig.add_subplot(gs[1])
-    conds = [("short_only", "alone"), ("fifo", "FIFO"), ("fifo_prio", "FIFO+\npriority"), ("defer_long", "defer\nlong")]
+    conds = [("short_only", "alone"), ("fifo", "FIFO"), ("fifo_prio", "FIFO\n+prio"), ("defer_long", "defer\nlong")]
     for m, name in (("google/gemma-4-31B-it", "gemma-4-31B"), ("deepseek-ai/DeepSeek-V4-Flash", "DeepSeek-V4-Flash")):
         vals = [float(summ[(summ["model"] == m) & (summ["condition"] == c)]["useful_per_s"].iloc[0]) for c, _ in conds]
         ax2.plot(range(4), vals, color=MODEL[name], lw=2)
@@ -266,7 +277,7 @@ def fig_interference() -> None:
     ax3.set_ylim(0, 10)
     ax3.set_xlabel("long requests still prefilling")
     ax3.set_ylabel("median s to first byte")
-    ax3.set_title("c  Delay inside the endpoint", pad=8)
+    ax3.set_title("c  Endpoint delay", pad=8)
     ax3.text(2.2, 9.0, "DeepSeek-V4-Flash", ha="right", fontsize=7.5, color=INK)
     ax3.text(2.2, 1.0, "gemma-4-31B", ha="right", fontsize=7.5, color=INK)
     ax3.grid(axis="x", visible=False)
@@ -275,12 +286,127 @@ def fig_interference() -> None:
             "long_p50_ttva", "long_p95_ttva", "short_invalid_rate", "legal_rate", "est_cost_usd"]
     FACTS["interference"] = summ[keep].replace([np.inf], "inf").round(4).to_dict("records")
     FACTS["overlap"] = ov.round(3).to_dict("records")
-    FACTS["verdicts"] = json.loads((d / "verdicts.json").read_text())["verdicts"]
+    FACTS["verdicts"] = verdicts
+
+
+# ---- Figure: E1 model ladder at scale, with the self-hosted decision model ----------------------
+
+LADDER_DIR = Path(os.environ.get("LADDER_DIR", RUNS / "scaleup" / "ladder"))
+INTELIF_DIR = Path(os.environ.get("INTELIF_DIR", RUNS / "scaleup" / "intelif"))
+ARM_LABEL = {"gpt-oss-20b/low": "gpt-oss-20b", "gpt-oss-120b/low": "gpt-oss-120b", "gpt-oss-120b/medium": "gpt-oss-120b, medium",
+             "gemma-4-31B/direct": "gemma-4-31B", "DeepSeek-V4-Flash/direct": "DeepSeek-V4-Flash",
+             "Qwen3.8-27B/direct": "Qwen3.8-27B", "Qwen3.5-397B/direct": "Qwen3.5-397B", "Kimi-K2.7/direct": "Kimi-K2.7",
+             "GLM-5.2/direct": "GLM-5.2"}
+LADDER_OFF = {}  # per-arm label offsets in points, tuned after viewing the data
+
+
+def _arm_color(arm: str) -> str:
+    fam = _short(arm)
+    return next((c for k, c in MODEL.items() if fam == k), MUTED)
+
+
+def fig_ladder2() -> None:
+    s = pd.read_csv(LADDER_DIR / "summary_scaleup.csv")
+    an = json.loads((LADDER_DIR / "analysis.json").read_text())
+    il = json.loads((INTELIF_DIR / "analysis.json").read_text()) if (INTELIF_DIR / "analysis.json").exists() else None
+    fig = plt.figure(figsize=(W, 2.7))
+    gs = fig.add_gridspec(1, 2, wspace=0.32)
+    ax, ax2 = fig.add_subplot(gs[0]), fig.add_subplot(gs[1], sharey=None)
+    for a in (ax, ax2):
+        a.set_xscale("log")
+        a.axhline(1.0, color=INK2, lw=0.7, zorder=1)
+    for _, r in s.iterrows():
+        col = _arm_color(r["arm"])
+        for a, x in ((ax, r["usd_per_100_stated"]), (ax2, r["latency_p50_s"])):
+            a.plot([x, x], [r["norm_score_lo"], r["norm_score_hi"]], color=col, lw=1.2, alpha=0.55, zorder=2)
+            _dot(a, x, r["norm_score"], col, size=6)
+        dx, dy = LADDER_OFF.get(r["arm"], (5, 0))
+        ax.annotate(ARM_LABEL[r["arm"]], (r["usd_per_100_stated"], r["norm_score"]), xytext=(dx, dy), textcoords="offset points",
+                    fontsize=6.8, color=INK, ha="left" if dx >= 0 else "right", va="center")
+    if il is not None:
+        ax2.plot([il["latency_p50_s"]], [il["norm_score"]], "D", ms=6, color=INK, mec="white", mew=1.2, zorder=4)
+        if "norm_score_lo" in il:
+            ax2.plot([il["latency_p50_s"]] * 2, [il["norm_score_lo"], il["norm_score_hi"]], color=INK, lw=1.2, alpha=0.55)
+        ax2.annotate("Intelif decision model\n(self-hosted, 4-core CPU)", (il["latency_p50_s"], il["norm_score"]), xytext=(-6, 0),
+                     textcoords="offset points", fontsize=6.8, ha="right", va="center", color=INK)
+    from matplotlib.ticker import NullFormatter
+    for a, ticks, fmt in ((ax, [0.005, 0.01, 0.02, 0.05, 0.1, 0.2], lambda t: f"${t:g}"),
+                          (ax2, [0.5, 1, 2, 5, 10, 20, 50], lambda t: f"{t:g}")):
+        lo, hi = a.get_xlim()
+        tk = [t for t in ticks if lo <= t <= hi]
+        a.set_xticks(tk)
+        a.set_xticklabels([fmt(t) for t in tk])
+        a.xaxis.set_minor_formatter(NullFormatter())
+    ax.set_xlabel("$ per 100 decisions (stated pricing, log)")
+    ax.set_ylabel("score relative to beam-search bot")
+    ax.set_title("a  Quality against cost", pad=7)
+    ax2.set_xlabel("median seconds per decision (log)")
+    ax2.set_title("b  Quality against time per move", pad=7)
+    sp = an["spearman_vs_score"]
+    ax.text(0.98, 0.03, f"Spearman vs price {sp['price_stated']['rho']:+.2f}", transform=ax.transAxes, ha="right",
+            va="bottom", fontsize=6.8, color=INK2)
+    _save(fig, "ladder")
+    FACTS["ladder2"] = {"summary": s.round(4).to_dict("records"), "analysis": an, "intelif": il}
+
+
+
+# ---- Figure: E2 memory policy at scale --------------------------------------------------------------
+
+MEMORY_DIR = Path(os.environ.get("MEMORY_DIR", RUNS / "scaleup" / "memory"))
+MEM_NAMES = {"oss20b": "gpt-oss-20b", "oss120b": "gpt-oss-120b", "dsv4flash": "DeepSeek-V4-Flash"}
+
+
+def fig_memory2() -> None:
+    s = pd.read_csv(MEMORY_DIR / "summary_scaleup.csv")
+    s["model"] = s["model"].map(lambda m: MEM_NAMES.get(m, m))
+    an = json.loads((MEMORY_DIR / "analysis.json").read_text())
+    order = ["stateless", "append", "window8"]
+    names = {"stateless": "none", "append": "append", "window8": "last 8"}
+    models = [m for m in ["gpt-oss-20b", "gpt-oss-120b", "DeepSeek-V4-Flash", "Qwen3.8-27B"] if m in set(s["model"])]
+    color = {**MODEL, "Qwen3.8-27B": "#eda100"}
+    fig, axes = plt.subplots(1, 3, figsize=(W, 2.45), gridspec_kw={"wspace": 0.62})
+    panels = ((axes[0], "uncached_per_decision", "a  Uncached input", "tokens per decision (log)", True),
+              (axes[1], "usd_per_100_stated", "b  Cost", "$ per 100 decisions (log)", True),
+              (axes[2], "regret", "c  Regret", "oracle regret per decision", False))
+    for ax, col, title, ylab, log in panels:
+        if log:
+            ax.set_yscale("log")
+        for m in models:
+            g = s[s["model"] == m].set_index("policy").loc[order]
+            ax.plot(range(3), g[col], color=color[m], lw=1.8)
+            for i, v in enumerate(g[col]):
+                _dot(ax, i, v, color[m], size=5.5)
+            if col == "usd_per_100_stated":
+                for i, (v, u) in enumerate(zip(g[col], g["usd_per_100_full"])):
+                    if u > v * 1.05:
+                        ax.plot([i], [u], "o", ms=4.5, mfc="white", mec=color[m], mew=1.1, zorder=3)
+        ax.set_xticks(range(3))
+        ax.set_xticklabels([names[p] for p in order])
+        ax.set_xlim(-0.3, 2.3)
+        ax.set_title(title, pad=7)
+        ax.set_ylabel(ylab)
+        ax.set_xlabel("history sent")
+        ax.grid(axis="x", visible=False)
+    from matplotlib.ticker import NullFormatter
+    for ax, ticks, fmt in ((axes[0], [100, 300, 1000, 3000, 10000, 30000], lambda t: f"{t / 1000:g}k" if t >= 1000 else f"{t:g}"),
+                           (axes[1], [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5], lambda t: f"${t:g}")):
+        lo, hi = ax.get_ylim()
+        tk = [t for t in ticks if lo <= t <= hi]
+        ax.set_yticks(tk)
+        ax.set_yticklabels([fmt(t) for t in tk])
+        ax.yaxis.set_minor_formatter(NullFormatter())
+    handles = [plt.Line2D([], [], color=color[m], lw=1.8, marker="o", ms=5) for m in models]
+    handles.append(plt.Line2D([], [], ls="", marker="o", ms=4.5, mfc="white", mec=INK2, mew=1.1))
+    fig.legend(handles, models + ["cached input at full price"], loc="lower center", ncol=len(handles),
+               bbox_to_anchor=(0.5, 0.97), handlelength=1.3, columnspacing=0.9, handletextpad=0.4, fontsize=6.8)
+    _save(fig, "memory")
+    FACTS["memory2"] = {"summary": s.round(4).to_dict("records"), "paired": an["paired"]}
+
 
 
 # ---- Figures: how many agent contexts a deployment keeps warm (E3 capacity sweep) ---------------
 
-CAP_DIRS = [RUNS / "scaleup" / "capacity", RUNS / "scaleup" / "capacity_part2"]
+CAP_DIRS = [d for d in (RUNS / "scaleup" / f"capacity{x}" for x in ("", "_part2", "_part3")) if (d / "rows.jsonl").exists()]
 
 
 def _capacity_data():
@@ -341,55 +467,99 @@ def fig_capacity_all() -> None:
 
 
 
-CAP_MAIN = ["openai/gpt-oss-20b", "google/gemma-4-31B-it", "deepseek-ai/DeepSeek-V4-Flash"]  # chosen after viewing all
+CAP_MAIN = ["openai/gpt-oss-20b", "MiniMaxAI/MiniMax-M2.5", "google/gemma-4-31B-it", "deepseek-ai/DeepSeek-V4-Flash"]  # chosen after viewing all
+CAP_COLOR = {"gpt-oss-20b": MODEL["gpt-oss-20b"], "MiniMax-M2.5": "#c2408f", "gemma-4-31B": MODEL["gemma-4-31B"],
+             "DeepSeek-V4-Flash": MODEL["DeepSeek-V4-Flash"]}
 
 
 def fig_capacity() -> None:
-    """Main text: the models whose curves show the pattern clearly, plus capacity against KV size for all."""
+    """Main text: the models whose curves show the pattern clearly, then capacity against KV size and against
+    aggregate prefill throughput for all nine models."""
     raw, df, s, c, ctx = _capacity_data()
-    fig = plt.figure(figsize=(W, 2.35))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 1.05], wspace=0.55)
-    ax, ax2, ax3 = (fig.add_subplot(gs[i]) for i in range(3))
+    c["peak"] = c["model"].map(s.groupby("model")["prefill_tok_per_s"].max())
+    fig, axes = plt.subplots(2, 2, figsize=(W, 4.1), gridspec_kw={"wspace": 0.42, "hspace": 0.72})
+    ax, ax2, ax3, ax4 = axes.flat
     for m in CAP_MAIN:
         g = s[s["model"] == m].sort_values("load")
-        col = MODEL[SHORT[m]]
-        ax.plot(g["load"], g["hit_rate"] * 100, color=col, lw=2)
-        ax2.plot(g["load"], g["prefill_tok_per_s"] / 1000, color=col, lw=2)
+        col = CAP_COLOR[SHORT[m]]
+        ax.plot(g["load"], g["hit_rate"] * 100, color=col, lw=1.8)
+        ax2.plot(g["load"], g["prefill_tok_per_s"] / 1000, color=col, lw=1.8)
         for x, y, z in zip(g["load"], g["hit_rate"] * 100, g["prefill_tok_per_s"] / 1000):
-            _dot(ax, x, y, col, size=5.5)
-            _dot(ax2, x, z, col, size=5.5)
+            _dot(ax, x, y, col, size=5)
+            _dot(ax2, x, z, col, size=5)
     for a in (ax, ax2):
         a.set_xscale("log", base=2)
-        a.set_xticks([1, 4, 16, 64])
-        a.set_xticklabels(["1", "4", "16", "64"])
+        a.set_xticks([1, 2, 4, 8, 16, 32, 64])
+        a.set_xticklabels(["1", "2", "4", "8", "16", "32", "64"])
         a.set_xlabel("concurrent agents (N)")
-    ax.set_ylim(-6, 110)
+    ax.set_ylim(-6, 112)
     ax.set_yticks([0, 50, 100])
     ax.set_yticklabels(["0%", "50%", "100%"])
-    ax.set_title("a  Still cached after 30 s", pad=7)
-    ax2.set_title("b  Prefill throughput", pad=7)
+    ax.set_ylabel("contexts still cached")
+    ax.set_title("a  Warm after 30 s idle", pad=7)
+    ax2.set_title("b  Aggregate prefill throughput", pad=7)
     ax2.set_ylabel("thousand tokens / s")
-    for m in CAP_MAIN:
-        g = s[s["model"] == m].sort_values("load")
-        ax2.text(70, g["prefill_tok_per_s"].iloc[-1] / 1000, SHORT[m], fontsize=7, color=INK, va="center", ha="left")
-    ax2.set_xlim(0.8, 64 * 1.15)
-    # (c) capacity against KV memory one context needs, all models
-    for _, r in c.iterrows():
-        name = SHORT[r["model"]]
-        col = MODEL.get(name, MUTED)
-        _dot(ax3, r["kv_mb_per_ctx"], r["capacity"], col, size=6)
-        if r["censored"]:
-            ax3.annotate("", xy=(r["kv_mb_per_ctx"], r["capacity"] * 1.6), xytext=(r["kv_mb_per_ctx"], r["capacity"] * 1.08),
-                         arrowprops=dict(arrowstyle="-|>", color=col, lw=1, mutation_scale=6))
-        ax3.text(r["kv_mb_per_ctx"] * 1.12, r["capacity"], name, fontsize=6.5, color=INK2, va="center")
-    ax3.set_xscale("log")
-    ax3.set_yscale("log", base=2)
-    ax3.set_yticks([1, 4, 16, 64])
-    ax3.set_yticklabels(["1", "4", "16", "64"])
-    ax3.set_xlabel(f"est. KV cache per {ctx / 1000:.1f}k context, MB")
-    ax3.set_ylabel("contexts kept warm")
-    ax3.set_title("c  Capacity vs KV size", pad=7)
+    ax2.set_xlim(0.8, 64 * 1.2)
+    ax2.set_ylim(0, 34)
+    handles = [plt.Line2D([], [], color=CAP_COLOR[SHORT[m]], lw=1.8, marker="o", ms=4.5) for m in CAP_MAIN]
+    fig.legend(handles, [SHORT[m] for m in CAP_MAIN], loc="lower center", ncol=4, bbox_to_anchor=(0.5, 0.965),
+               handlelength=1.6, columnspacing=1.4, fontsize=7.2)
+    r = lambda x, y: x.rank().corr(y.rank())
+    for a, col, xlabel, title, log in ((ax3, "kv_mb_per_ctx", f"est. KV cache per {ctx / 1000:.1f}k-token context, MB",
+                                        "c  Capacity vs KV size", True),
+                                       (ax4, "peak", "peak aggregate prefill, thousand tokens / s",
+                                        "d  Capacity vs throughput", False)):
+        for _, row in c.iterrows():
+            name = SHORT[row["model"]]
+            colr = CAP_COLOR.get(name, MUTED)
+            x = row[col] / (1000 if col == "peak" else 1)
+            _dot(a, x, row["capacity"], colr, size=5.5)
+            if row["censored"]:
+                a.annotate("", xy=(x, row["capacity"] * 1.55), xytext=(x, row["capacity"] * 1.08),
+                           arrowprops=dict(arrowstyle="-|>", color=colr, lw=0.9, mutation_scale=6))
+        a.set_yscale("log", base=2)
+        a.set_yticks([4, 8, 16, 32, 64])
+        a.set_yticklabels(["4", "8", "16", "32", "64"])
+        a.set_ylim(2.8, 120)
+        a.set_ylabel("contexts kept warm")
+        a.set_xlabel(xlabel)
+        a.set_title(title, pad=7)
+        rho = r(c["capacity"], c[col])
+        tx = (0.97, "right", 0.05, "bottom") if log else (0.03, "left", 0.95, "top")
+        a.text(tx[0], tx[2], f"Spearman {rho:+.2f}, 9 models", transform=a.transAxes, fontsize=6.8, color=INK2, va=tx[3],
+               ha=tx[1])
+        if log:
+            a.set_xscale("log")
+            a.set_xticks([20, 50, 100, 200, 500, 1000])
+            a.set_xticklabels(["20", "50", "100", "200", "500", "1000"])
+            from matplotlib.ticker import NullFormatter
+            a.xaxis.set_minor_formatter(NullFormatter())
+    ax4.set_xscale("log")
+    ax4.set_xticks([2, 5, 10, 20, 30])
+    ax4.set_xticklabels(["2", "5", "10", "20", "30"])
+    from matplotlib.ticker import NullFormatter
+    ax4.xaxis.set_minor_formatter(NullFormatter())
+    ax4.set_xlim(1.4, 45)
+    lab = {"DeepSeek-V4-Flash": (5, 0, "left"), "GLM-5.2": (0, 8, "center"), "MiniMax-M2.5": (5, 0, "left"),
+           "gpt-oss-20b": (0, -9, "center"), "gpt-oss-120b": (-5, 0, "right"), "Qwen3.5-397B": (-5, 0, "right")}
+    for _, row in c.iterrows():
+        name = SHORT[row["model"]]
+        if name in lab:
+            dx, dy, ha = lab[name]
+            ax4.annotate(name, (row["peak"] / 1000, row["capacity"]), xytext=(dx, dy), textcoords="offset points",
+                         fontsize=6.3, color=INK2, ha=ha, va="center")
+    trio = c[c["model"].map(SHORT).isin(["Kimi-K2.7", "gemma-4-31B", "Qwen3.8-27B"])]
+    ax4.annotate("Kimi, gemma,\nQwen3.8", (trio["peak"].min() / 1000, 16), xytext=(-5, 0), textcoords="offset points",
+                 fontsize=6.3, color=INK2, ha="right", va="center")
+    for name, (dx, dy, ha) in {"DeepSeek-V4-Flash": (5, 0, "left"), "MiniMax-M2.5": (0, 9, "center")}.items():
+        row = c[c["model"].map(SHORT) == name].iloc[0]
+        ax3.annotate(name, (row["kv_mb_per_ctx"], row["capacity"]), xytext=(dx, dy), textcoords="offset points",
+                     fontsize=6.3, color=INK2, ha=ha, va="center")
     _save(fig, "capacity")
+    FACTS["capacity_rho"] = {"capacity_vs_kv": round(r(c["capacity"], c["kv_mb_per_ctx"]), 3),
+                             "capacity_vs_peak_prefill": round(r(c["capacity"], c["peak"]), 3),
+                             "cold_vs_active": round(r(c["cold_p50_s"], c["active_b"]), 3)}
+    FACTS["capacity_peak"] = c[["model", "capacity", "censored", "peak", "kv_mb_per_ctx", "active_b", "cold_p50_s"]].round(2).to_dict("records")
 
 
 

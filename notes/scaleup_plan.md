@@ -85,3 +85,12 @@ The container has 4 CPU cores and no GPU. The E1/E2 oracle needs about 1.6 CPU-s
   played by Intelif.
 - The oracle then runs on all four cores. E5's CPU latency is measured while E1/E2/E4 API clients run
   alongside (light CPU use); this is reported.
+
+## Addendum 3 (2026-10-04, 06:55 UTC, before E1/E2/E4 data)
+
+- Budget under the guard's full-price accounting is tight. E2's Qwen3.8-27B window8 arm (est. $0.7) is
+  dropped; E2's cap becomes $3.6. Qwen3.8 stays for append vs no history.
+- E3 part 2 may stop at its $4.1 cap before Kimi/Qwen3.5/GLM/MiniMax finish; any rounds left are run as
+  part 3 (same design, alone, before E1/E2).
+- E4's number of blocks per model is set just before it runs: the largest number ≤ 13 whose estimated
+  cost (pilot: ≈$0.085 per block per model, full price) fits the remaining program budget.

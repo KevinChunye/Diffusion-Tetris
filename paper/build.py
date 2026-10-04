@@ -1,4 +1,4 @@
-"""build.py - figures + paper.pdf from paper.html with headless Chromium (no TeX needed).
+"""build.py - figures + references + paper.pdf from paper.html with headless Chromium (no TeX needed).
 
     python paper/build.py            # writes paper/figures/* and paper/paper.pdf
     python paper/build.py --pages DIR  # also rasterize every page to DIR for a layout check
@@ -32,6 +32,7 @@ def main() -> None:
     args = ap.parse_args()
     if not args.skip_figures:
         subprocess.run([sys.executable, str(HERE / "figures.py")], check=True)
+    subprocess.run([sys.executable, str(HERE / "refs.py")], check=True)
     pdf = HERE / "paper.pdf"
     subprocess.run([chromium(), "--headless", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
                     "--allow-file-access-from-files", f"--print-to-pdf={pdf}", (HERE / "paper.html").as_uri()],

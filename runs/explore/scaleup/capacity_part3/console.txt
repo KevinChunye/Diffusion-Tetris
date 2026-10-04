@@ -1,0 +1,6 @@
+[capacity]       Kimi-K2.7-Code rep 0 N=64: reported hits 21/64 errors 43 spent $0.665
+[capacity]        GLM-5.2-NVFP4 rep 0 N=16: reported hits 0/16 errors 6 spent $0.925
+[capacity]        GLM-5.2-NVFP4 rep 0 N= 4: reported hits 0/4 errors 0 spent $0.988
+[capacity]        GLM-5.2-NVFP4 rep 0 N= 8: reported hits 0/8 errors 0 spent $1.115
+[capacity]        GLM-5.2-NVFP4 rep 0 N= 1: reported hits 0/1 errors 0 spent $1.130
+runs/explore/scaleup/capacity_part3

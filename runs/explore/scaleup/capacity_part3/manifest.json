@@ -1,0 +1,44 @@
+{
+ "live": true,
+ "mock": false,
+ "git_commit": "db0a756b4fa817516877e23909296ee92202eed8",
+ "started_utc": "2026-10-04T07:01:37Z",
+ "config_sha256": "f342f7f95811d2a1b1a886bfd74287c644f76ca9d917f83ec64a930b9e0b58ae",
+ "plan": [
+  {
+   "model": "moonshotai/Kimi-K2.7-Code",
+   "rounds": [
+    {
+     "model": "moonshotai/Kimi-K2.7-Code",
+     "rep": 0,
+     "load": 64
+    }
+   ]
+  },
+  {
+   "model": "lukealonso/GLM-5.2-NVFP4",
+   "rounds": [
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 16
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 4
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 8
+    },
+    {
+     "model": "lukealonso/GLM-5.2-NVFP4",
+     "rep": 0,
+     "load": 1
+    }
+   ]
+  }
+ ]
+}

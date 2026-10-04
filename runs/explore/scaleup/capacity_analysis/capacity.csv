@@ -1,0 +1,10 @@
+model,capacity,max_tested,censored,cold_p50_s
+MiniMaxAI/MiniMax-M2.5,32,64,False,0.7523142479999478
+Qwen/Qwen3.5-397B-A17B-FP8,32,32,True,2.693864688999838
+Qwen/Qwen3.8-27B-FP8,16,64,False,0.9751850410002589
+deepseek-ai/DeepSeek-V4-Flash,4,64,False,1.3552029269999366
+google/gemma-4-31B-it,16,64,False,1.2277823190001982
+lukealonso/GLM-5.2-NVFP4,8,16,False,3.604168065000522
+moonshotai/Kimi-K2.7-Code,16,64,False,1.5315877299999556
+openai/gpt-oss-120b,64,64,True,0.634783797000182
+openai/gpt-oss-20b,64,64,True,0.543490729000041
