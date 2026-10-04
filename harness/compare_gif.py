@@ -97,38 +97,43 @@ def check_same_pieces(runs: List[AgentRun]) -> int:
 
 # ---- composition ----------------------------------------------------------------------------------
 
+PAD = 28                     # outer margin of the whole frame
+GAP = 28                     # gutter between agent cards, so each board reads as its own agent
+CANVAS = (9, 10, 14)         # frame background, a step darker than the cards
+CARD_EDGE = (58, 64, 80)     # hairline around each card
+
 def _header(width: int, seed: int, k: int, n: int, curr: Optional[str], nxt: Optional[str]) -> Image.Image:
-    img = Image.new("RGB", (width, 92), BG)
+    img = Image.new("RGB", (width, 104), CANVAS)
     d = ImageDraw.Draw(img)
-    d.text((16, 10), "Same game, same pieces", fill=TEXT, font=font(24))
-    d.text((16, 44), f"seed {seed}  ·  piece {min(k, n)} of {n}", fill=MUTED, font=font(16, False))
-    d.text((16, 66), "identical piece sequence for every agent, checked at every move", fill=MUTED, font=font(13, False))
-    x = width - 16
+    d.text((PAD, 18), "Same game, same pieces", fill=TEXT, font=font(24))
+    d.text((PAD, 52), f"seed {seed}  ·  piece {min(k, n)} of {n}", fill=MUTED, font=font(16, False))
+    d.text((PAD, 74), "identical piece sequence for every agent, checked at every move", fill=MUTED, font=font(13, False))
+    x = width - PAD
     for label, piece in (("next", nxt), ("everyone gets", curr)):
         mini = draw_mini(piece, cell=16, box=(76, 44), bg=BOARD_BG)
         x -= mini.width
-        img.paste(mini, (x, 26))
+        img.paste(mini, (x, 38))
         tw = d.textlength(label, font=font(14))
-        d.text((x + (mini.width - tw) / 2, 6), label, fill=MUTED, font=font(14))
+        d.text((x + (mini.width - tw) / 2, 16), label, fill=MUTED, font=font(14))
         x -= 18
     return img
 
 
 def _footer(width: int, states: List[PanelState], scale_max: int) -> Image.Image:
     rows = sorted(states, key=lambda s: (-s.score, -s.lines))
-    h = 28 + 24 * len(rows)
-    img = Image.new("RGB", (width, h), BG)
+    h = 28 + 24 * len(rows) + PAD
+    img = Image.new("RGB", (width, h), CANVAS)
     d = ImageDraw.Draw(img)
-    d.text((16, 6), "LEADERBOARD", fill=MUTED, font=font(13))
+    d.text((PAD, 6), "LEADERBOARD", fill=MUTED, font=font(13))
     name_w = max(d.textlength(f"{i + 1}. {s.name}", font=font(14)) for i, s in enumerate(rows))
     labels = [f"{s.score} pts · {s.lines} lines" + ("  · game over" if s.over else "") for s in rows]
     text_w = max(d.textlength("9999 pts · 999 lines  · game over", font=font(13, False)), 0)
-    bar_x = int(30 + name_w + 16)
-    bar_w = max(60, int(width - bar_x - text_w - 26))
+    bar_x = int(PAD + 14 + name_w + 16)
+    bar_w = max(60, int(width - bar_x - text_w - PAD - 10))
     for i, (s, label) in enumerate(zip(rows, labels)):
         y = 26 + 24 * i
-        d.rectangle([16, y + 4, 22, y + 16], fill=s.accent)
-        d.text((30, y), f"{i + 1}. {s.name}", fill=TEXT if i == 0 else MUTED, font=font(14))
+        d.rectangle([PAD, y + 4, PAD + 6, y + 16], fill=s.accent)
+        d.text((PAD + 14, y), f"{i + 1}. {s.name}", fill=TEXT if i == 0 else MUTED, font=font(14))
         d.rounded_rectangle([bar_x, y + 3, bar_x + bar_w, y + 17], radius=4, fill=PANEL)
         fill = int(bar_w * min(1.0, s.score / max(1, scale_max)))
         if fill > 0:
@@ -137,18 +142,29 @@ def _footer(width: int, states: List[PanelState], scale_max: int) -> Image.Image
     return img
 
 
+def _card(tile: Image.Image) -> Tuple[Image.Image, Image.Image]:
+    """A tile with rounded corners and a hairline edge, plus the mask to paste it with."""
+    from PIL import ImageDraw as _D
+    mask = Image.new("L", tile.size, 0)
+    _D.Draw(mask).rounded_rectangle([0, 0, tile.width - 1, tile.height - 1], radius=12, fill=255)
+    card = tile.copy()
+    _D.Draw(card).rounded_rectangle([0, 0, tile.width - 1, tile.height - 1], radius=12, outline=CARD_EDGE, width=1)
+    return card, mask
+
+
 def _canvas(states: List[PanelState], ncols: int, seed: int, k: int, n: int, curr, nxt, scale_max: int, cell: int) -> Image.Image:
     tiles = [draw_panel(s, cell) for s in states]
-    gap = 10
     tw, th = tiles[0].size
     nrows = -(-len(tiles) // ncols)
-    width = ncols * tw + (ncols + 1) * gap
+    width = 2 * PAD + ncols * tw + (ncols - 1) * GAP
     head, foot = _header(width, seed, k, n, curr, nxt), _footer(width, states, scale_max)
-    img = Image.new("RGB", (width, head.height + nrows * (th + gap) + foot.height), BG)
+    body_h = nrows * th + (nrows - 1) * GAP + GAP
+    img = Image.new("RGB", (width, head.height + body_h + foot.height), CANVAS)
     img.paste(head, (0, 0))
     for i, t in enumerate(tiles):
-        img.paste(t, (gap + (i % ncols) * (tw + gap), head.height + (i // ncols) * (th + gap)))
-    img.paste(foot, (0, head.height + nrows * (th + gap)))
+        card, mask = _card(t)
+        img.paste(card, (PAD + (i % ncols) * (tw + GAP), head.height + (i // ncols) * (th + GAP)), mask)
+    img.paste(foot, (0, head.height + body_h))
     return img
 
 

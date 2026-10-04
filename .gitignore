@@ -61,3 +61,6 @@ checkpoints/
 
 # Secrets for the Jev runner
 deploy/jev/jev.env
+
+# The gallery's animations are part of the release
+!gallery/*.gif

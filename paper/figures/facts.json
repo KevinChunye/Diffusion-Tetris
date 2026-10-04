@@ -1,5 +1,5 @@
 {
- "ladder2": {
+ "ladder": {
   "summary": [
    {
     "arm": "gpt-oss-120b/medium",
@@ -188,7 +188,7 @@
    "dropped_budget_games": []
   }
  },
- "memory2": {
+ "memory": {
   "summary": [
    {
     "model": "DeepSeek-V4-Flash",
@@ -475,6 +475,103 @@
    }
   }
  },
+ "capacity_rho": {
+  "capacity_vs_kv": -0.12,
+  "capacity_vs_peak_prefill": 0.958,
+  "cold_vs_active": 0.817
+ },
+ "capacity_table": [
+  {
+   "model": "MiniMaxAI/MiniMax-M2.5",
+   "capacity": 32,
+   "max_tested": 64,
+   "censored": false,
+   "cold_p50_s": 0.752,
+   "kv_mb_per_ctx": 1335.422,
+   "active_b": 10.0,
+   "peak": 13004.132
+  },
+  {
+   "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+   "capacity": 32,
+   "max_tested": 32,
+   "censored": true,
+   "cold_p50_s": 2.694,
+   "kv_mb_per_ctx": 341.543,
+   "active_b": 17.0,
+   "peak": 10827.878
+  },
+  {
+   "model": "Qwen/Qwen3.8-27B-FP8",
+   "capacity": 16,
+   "max_tested": 64,
+   "censored": false,
+   "cold_p50_s": 0.975,
+   "kv_mb_per_ctx": 488.625,
+   "active_b": 27.0,
+   "peak": 7394.385
+  },
+  {
+   "model": "deepseek-ai/DeepSeek-V4-Flash",
+   "capacity": 4,
+   "max_tested": 64,
+   "censored": false,
+   "cold_p50_s": 1.355,
+   "kv_mb_per_ctx": 21.165,
+   "active_b": 13.0,
+   "peak": 4843.641
+  },
+  {
+   "model": "google/gemma-4-31B-it",
+   "capacity": 16,
+   "max_tested": 64,
+   "censored": false,
+   "cold_p50_s": 1.228,
+   "kv_mb_per_ctx": 1015.391,
+   "active_b": 30.7,
+   "peak": 6651.411
+  },
+  {
+   "model": "lukealonso/GLM-5.2-NVFP4",
+   "capacity": 8,
+   "max_tested": 16,
+   "censored": false,
+   "cold_p50_s": 3.604,
+   "kv_mb_per_ctx": 525.015,
+   "active_b": 40.0,
+   "peak": 1706.196
+  },
+  {
+   "model": "moonshotai/Kimi-K2.7-Code",
+   "capacity": 16,
+   "max_tested": 64,
+   "censored": false,
+   "cold_p50_s": 1.532,
+   "kv_mb_per_ctx": 369.53,
+   "active_b": 32.0,
+   "peak": 5020.485
+  },
+  {
+   "model": "openai/gpt-oss-120b",
+   "capacity": 64,
+   "max_tested": 64,
+   "censored": true,
+   "cold_p50_s": 0.635,
+   "kv_mb_per_ctx": 198.352,
+   "active_b": 5.1,
+   "peak": 20718.387
+  },
+  {
+   "model": "openai/gpt-oss-20b",
+   "capacity": 64,
+   "max_tested": 64,
+   "censored": true,
+   "cold_p50_s": 0.543,
+   "kv_mb_per_ctx": 132.234,
+   "active_b": 3.6,
+   "peak": 30789.281
+  }
+ ],
  "capacity_summary": [
   {
    "model": "MiniMaxAI/MiniMax-M2.5",
@@ -1377,183 +1474,12 @@
    "err_rate": 0.0
   }
  ],
- "capacity_table": [
-  {
-   "model": "MiniMaxAI/MiniMax-M2.5",
-   "capacity": 32,
-   "max_tested": 64,
-   "censored": false,
-   "cold_p50_s": 0.752,
-   "kv_mb_per_ctx": 1335.18,
-   "active_b": 10.0
-  },
-  {
-   "model": "Qwen/Qwen3.5-397B-A17B-FP8",
-   "capacity": 32,
-   "max_tested": 32,
-   "censored": true,
-   "cold_p50_s": 2.694,
-   "kv_mb_per_ctx": 341.514,
-   "active_b": 17.0
-  },
-  {
-   "model": "Qwen/Qwen3.8-27B-FP8",
-   "capacity": 16,
-   "max_tested": 64,
-   "censored": false,
-   "cold_p50_s": 0.975,
-   "kv_mb_per_ctx": 488.562,
-   "active_b": 27.0
-  },
-  {
-   "model": "deepseek-ai/DeepSeek-V4-Flash",
-   "capacity": 4,
-   "max_tested": 64,
-   "censored": false,
-   "cold_p50_s": 1.355,
-   "kv_mb_per_ctx": 21.162,
-   "active_b": 13.0
-  },
-  {
-   "model": "google/gemma-4-31B-it",
-   "capacity": 16,
-   "max_tested": 64,
-   "censored": false,
-   "cold_p50_s": 1.228,
-   "kv_mb_per_ctx": 1015.352,
-   "active_b": 30.7
-  },
-  {
-   "model": "lukealonso/GLM-5.2-NVFP4",
-   "capacity": 8,
-   "max_tested": 16,
-   "censored": false,
-   "cold_p50_s": 3.604,
-   "kv_mb_per_ctx": 524.919,
-   "active_b": 40.0
-  },
-  {
-   "model": "moonshotai/Kimi-K2.7-Code",
-   "capacity": 16,
-   "max_tested": 64,
-   "censored": false,
-   "cold_p50_s": 1.532,
-   "kv_mb_per_ctx": 369.463,
-   "active_b": 32.0
-  },
-  {
-   "model": "openai/gpt-oss-120b",
-   "capacity": 64,
-   "max_tested": 64,
-   "censored": true,
-   "cold_p50_s": 0.635,
-   "kv_mb_per_ctx": 198.316,
-   "active_b": 5.1
-  },
-  {
-   "model": "openai/gpt-oss-20b",
-   "capacity": 64,
-   "max_tested": 64,
-   "censored": true,
-   "cold_p50_s": 0.543,
-   "kv_mb_per_ctx": 132.211,
-   "active_b": 3.6
-  }
- ],
- "capacity_context_tokens": 5513.0,
+ "capacity_context_tokens": 5514.0,
  "capacity_agents": {
   "kept": 2208,
   "excluded_contended": 555,
-  "calls_total": 5526
+  "calls": 5526
  },
- "capacity_rho": {
-  "capacity_vs_kv": -0.12,
-  "capacity_vs_peak_prefill": 0.958,
-  "cold_vs_active": 0.817
- },
- "capacity_peak": [
-  {
-   "model": "MiniMaxAI/MiniMax-M2.5",
-   "capacity": 32,
-   "censored": false,
-   "peak": 13004.13,
-   "kv_mb_per_ctx": 1335.18,
-   "active_b": 10.0,
-   "cold_p50_s": 0.75
-  },
-  {
-   "model": "Qwen/Qwen3.5-397B-A17B-FP8",
-   "capacity": 32,
-   "censored": true,
-   "peak": 10827.88,
-   "kv_mb_per_ctx": 341.51,
-   "active_b": 17.0,
-   "cold_p50_s": 2.69
-  },
-  {
-   "model": "Qwen/Qwen3.8-27B-FP8",
-   "capacity": 16,
-   "censored": false,
-   "peak": 7394.38,
-   "kv_mb_per_ctx": 488.56,
-   "active_b": 27.0,
-   "cold_p50_s": 0.98
-  },
-  {
-   "model": "deepseek-ai/DeepSeek-V4-Flash",
-   "capacity": 4,
-   "censored": false,
-   "peak": 4843.64,
-   "kv_mb_per_ctx": 21.16,
-   "active_b": 13.0,
-   "cold_p50_s": 1.36
-  },
-  {
-   "model": "google/gemma-4-31B-it",
-   "capacity": 16,
-   "censored": false,
-   "peak": 6651.41,
-   "kv_mb_per_ctx": 1015.35,
-   "active_b": 30.7,
-   "cold_p50_s": 1.23
-  },
-  {
-   "model": "lukealonso/GLM-5.2-NVFP4",
-   "capacity": 8,
-   "censored": false,
-   "peak": 1706.2,
-   "kv_mb_per_ctx": 524.92,
-   "active_b": 40.0,
-   "cold_p50_s": 3.6
-  },
-  {
-   "model": "moonshotai/Kimi-K2.7-Code",
-   "capacity": 16,
-   "censored": false,
-   "peak": 5020.49,
-   "kv_mb_per_ctx": 369.46,
-   "active_b": 32.0,
-   "cold_p50_s": 1.53
-  },
-  {
-   "model": "openai/gpt-oss-120b",
-   "capacity": 64,
-   "censored": true,
-   "peak": 20718.39,
-   "kv_mb_per_ctx": 198.32,
-   "active_b": 5.1,
-   "cold_p50_s": 0.63
-  },
-  {
-   "model": "openai/gpt-oss-20b",
-   "capacity": 64,
-   "censored": true,
-   "peak": 30789.28,
-   "kv_mb_per_ctx": 132.21,
-   "active_b": 3.6,
-   "cold_p50_s": 0.54
-  }
- ],
  "interference": [
   {
    "model": "google/gemma-4-31B-it",
@@ -1849,116 +1775,50 @@
   }
  ],
  "decision": {
-  "ms_per_token": 27.77,
-  "latency_p50_s": 30.990714855999613,
-  "quiet": {
-   "n": 30,
-   "p50_s": 26.54904720400009,
-   "same_choice": 1.0,
-   "min_s": 12.543343748000552,
-   "max_s": 33.10036089299865
+  "intelif_quiet_p50_s": 26.54904720400009,
+  "intelif_quiet_min_s": 12.543343748000552,
+  "intelif_quiet_max_s": 33.10036089299865,
+  "intelif_ms_per_token": 27.76646520255217,
+  "llm_api_median_s": 0.7110197780002636,
+  "same_games_scores": {
+   "Qwen3.5-397B": 0.0238,
+   "DeepSeek-V4-Flash": 0.0833,
+   "Qwen3.8-27B": 0.127,
+   "GLM-5.2": 0.3492,
+   "gpt-oss-20b": 0.381,
+   "Intelif": 0.4127,
+   "gpt-oss-120b": 0.5119,
+   "gpt-oss-120b (medium)": 0.7579,
+   "Kimi-K2.7": 0.8492,
+   "gemma-4-31B": 0.877
   },
-  "input_tokens_mean": 813.7280334728033,
-  "decisions": 239,
-  "episodes": [
-   {
-    "arm": "intelif-qwen3-4b/decision",
-    "episode_seed": 1000,
-    "pieces_placed": 65,
-    "lines_cleared": 11,
-    "score": 22,
-    "topped_out": true,
-    "latency_p50_s": 19.3482,
-    "input_tokens_mean": 833.1692,
-    "ref_beam_score": 85.0,
-    "ref_random_score": 0.0,
-    "norm_score": 0.2588,
-    "regret_beam": 2.3818,
-    "top1_beam": 0.2769
-   },
-   {
-    "arm": "intelif-qwen3-4b/decision",
-    "episode_seed": 1001,
-    "pieces_placed": 74,
-    "lines_cleared": 14,
-    "score": 28,
-    "topped_out": true,
-    "latency_p50_s": 21.6694,
-    "input_tokens_mean": 795.9865,
-    "ref_beam_score": 82.0,
-    "ref_random_score": 0.0,
-    "norm_score": 0.3415,
-    "regret_beam": 0.6789,
-    "top1_beam": 0.3649
-   },
-   {
-    "arm": "intelif-qwen3-4b/decision",
-    "episode_seed": 1002,
-    "pieces_placed": 100,
-    "lines_cleared": 26,
-    "score": 54,
-    "topped_out": false,
-    "latency_p50_s": 35.4343,
-    "input_tokens_mean": 814.22,
-    "ref_beam_score": 85.0,
-    "ref_random_score": 0.0,
-    "norm_score": 0.6353,
-    "regret_beam": 1.0053,
-    "top1_beam": 0.33
-   }
-  ],
-  "llm_same_seeds": {
-   "Qwen3.5-397B/direct": 0.0238,
-   "DeepSeek-V4-Flash/direct": 0.0833,
-   "Qwen3.8-27B/direct": 0.127,
-   "GLM-5.2/direct": 0.3492,
-   "gpt-oss-20b/low": 0.381,
-   "gpt-oss-120b/low": 0.5119,
-   "gpt-oss-120b/medium": 0.7579,
-   "Kimi-K2.7/direct": 0.8492,
-   "gemma-4-31B/direct": 0.877
-  },
-  "gemma_api_latency_p50_s": 0.7110197780002636
+  "jev_present": false
  },
  "calls_by_experiment": {
-  "E1 model ladder": {
+  "E1": {
    "calls": 6403,
    "failed": 0,
    "usd_stated": 3.015,
    "usd_full": 3.035
   },
-  "E2 history policy": {
+  "E2": {
    "calls": 4168,
    "failed": 41,
    "usd_stated": 1.309,
    "usd_full": 3.617
   },
-  "E3 cache capacity": {
+  "E3": {
    "calls": 5542,
    "failed": 852,
    "usd_stated": 3.634,
    "usd_full": 3.985
   },
-  "E4 interference": {
+  "E4": {
    "calls": 3630,
    "failed": 0,
    "usd_stated": 1.313,
    "usd_full": 1.313
   }
  },
- "spend_total_usd": 19.4182,
- "spend_by_iteration": {
-  "0": 0.435,
-  "1": 0.131,
-  "2": 0.8689,
-  "3": 0.928,
-  "4": 0.844,
-  "5": 0.2676,
-  "6": 1.7013,
-  "8": 0.7022,
-  "9": 5.5759,
-  "10": 3.035,
-  "11": 3.6168,
-  "12": 1.3127
- }
+ "spend_total_usd": 19.4182
 }
