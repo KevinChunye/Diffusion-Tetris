@@ -103,3 +103,51 @@ def test_decision_model_plays_legal_moves_and_logs_every_option(tmp_path):
     assert len(recs) == 12
     assert abs(sum(o["p"] for o in recs[0]["options"].values()) - 1) < 1e-9
     assert len(recs[0]["options"]) == rows[0]["n_legal"]
+
+
+def test_jev_backend_against_fake_typesafe_server(tmp_path, monkeypatch):
+    """The Jev client speaks POST /v1/systemone with a Bearer key, retries a 429, maps answers to the runner's
+    shape, and never writes the key into any log."""
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from llm.decision_model import JevClient, play
+
+    seen = {"auth": set(), "n": 0}
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen["n"] += 1
+            seen["auth"].add(self.headers.get("Authorization"))
+            req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            assert self.path == "/v1/systemone" and req["model"] == "jev-1.13.0"
+            if seen["n"] == 2:  # one rate-limit response to exercise the retry
+                self.send_response(429); self.end_headers(); return
+            crit = req["questions"]["move"]["criteria"]
+            keys = list(crit)
+            probs = {k: (0.5 if i == 0 else 0.5 / max(1, len(keys) - 1)) for i, k in enumerate(keys)}
+            body = {"model": "jev-1.13.0", "answers": {"move": {"type": "choice", "choice": keys[0], "confidence": 0.31,
+                                                                "probabilities": probs}},
+                    "usage": {"input_tokens": 777, "output_tokens": 5}}
+            data = json.dumps(body).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setenv("TYPESAFE_API_KEY", "sk-test-secret")
+    monkeypatch.setenv("TYPESAFE_BASE_URL", f"http://127.0.0.1:{srv.server_port}")
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    client = JevClient(model="jev-1.13.0")
+    log = tmp_path / "calls.jsonl"
+    rows, ep = play(client, seed=1000, pieces=6, arm="jev/decision", calls_log=log, model_label="jev-1.13.0", tag="jev")
+    srv.shutdown()
+    assert seen["auth"] == {"Bearer sk-test-secret"}
+    assert len(rows) == 6 and rows[0]["input_tokens"] == 777
+    assert abs(rows[0]["top_prob"] - 0.5) < 1e-9 and rows[0]["confidence"] == 0.31  # confidence kept apart from p
+    assert "sk-test-secret" not in log.read_text()
+    assert json.loads(log.read_text().splitlines()[0])["served_model"] == "jev-1.13.0"

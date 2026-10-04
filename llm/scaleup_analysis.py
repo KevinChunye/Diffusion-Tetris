@@ -2,7 +2,8 @@
 
   python -m llm.scaleup_analysis ladder  runs/explore/scaleup/ladder     # E1
   python -m llm.scaleup_analysis memory  runs/explore/scaleup/memory     # E2
-  python -m llm.scaleup_analysis intelif runs/explore/scaleup/intelif    # decision model (oracle regret, scores)
+  python -m llm.scaleup_analysis decision runs/explore/scaleup/intelif_all  # decision model: Intelif or Jev
+                                                                           # (oracle regret, scores; alias: intelif)
 
 Cost is estimated two ways from reported token counts:
 - `usd_stated`: the provider's stated policy (cached input tokens billed at $0 for every model);
@@ -207,10 +208,10 @@ def intelif(run_dir: str, workers: int = 3) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("kind", choices=["ladder", "memory", "intelif"])
+    ap.add_argument("kind", choices=["ladder", "memory", "decision", "intelif"])
     ap.add_argument("run_dir")
     args = ap.parse_args()
-    out = {"ladder": ladder, "memory": memory, "intelif": intelif}[args.kind](args.run_dir)
+    out = {"ladder": ladder, "memory": memory, "decision": intelif, "intelif": intelif}[args.kind](args.run_dir)
     print(json.dumps(out, indent=1))
 
 

@@ -58,3 +58,6 @@ checkpoints/
 .lightning/
 .lightning_studio/
 
+
+# Secrets for the Jev runner
+deploy/jev/jev.env

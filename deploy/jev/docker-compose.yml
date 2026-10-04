@@ -1,0 +1,14 @@
+# Run from the repository root:
+#   cp deploy/jev/jev.env.example deploy/jev/jev.env   # then put your key in jev.env (never commit it)
+#   GIT_COMMIT=$(git rev-parse HEAD) docker compose -f deploy/jev/docker-compose.yml run --rm jev-tetris
+# Results land in runs/explore/scaleup/jev/ on the host (mounted volume).
+services:
+  jev-tetris:
+    build:
+      context: ../..
+      dockerfile: deploy/jev/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    env_file: jev.env
+    volumes:
+      - ../../runs/explore/scaleup:/app/runs/explore/scaleup

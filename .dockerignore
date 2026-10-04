@@ -1,0 +1,14 @@
+# Only the game engine and llm/decision_model.py are copied into the Jev image; keep the build context small.
+.git
+runs
+paper
+gallery
+notes
+diffusion
+experiments
+lightning_studio
+configs
+**/__pycache__
+**/*.gif
+**/*.png
+deploy/jev/jev.env
