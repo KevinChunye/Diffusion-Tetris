@@ -71,3 +71,17 @@ Run order, so that our own traffic never contaminates a cache or latency measure
   played in a fixed order (1000–1002, then 5000–5009, the E1 seeds) and no new game starts after
   11:45 UTC. Analyses: score relative to the beam-search bot, per-move oracle regret, CPU latency per
   decision against input tokens, and whether the top option's probability tracks regret.
+
+## Addendum 2 (2026-10-04, 06:50 UTC, compute schedule; no results analyzed)
+
+The container has 4 CPU cores and no GPU. The E1/E2 oracle needs about 1.6 CPU-seconds per decision
+(≈12,000 decisions, ≈5 core-hours) and Intelif needs ≈20 s × 3 cores per decision. To finish every run by
+13:15 UTC:
+- E1 and E2 run their API phase with `--skip_oracle`; the identical oracle is added afterwards with
+  `python -m llm.add_oracle` (same settings, read from each run's config.yaml).
+- E5 is reduced to seeds 1000–1002, the seeds on which all nine iteration-6 language-model configurations
+  were played (paired comparison) and which the same-game GIFs show. The Intelif process is stopped as
+  soon as its third game ends; any partly played fourth game is discarded. E1's ten new seeds are not
+  played by Intelif.
+- The oracle then runs on all four cores. E5's CPU latency is measured while E1/E2/E4 API clients run
+  alongside (light CPU use); this is reported.
