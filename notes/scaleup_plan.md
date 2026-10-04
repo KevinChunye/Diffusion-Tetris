@@ -102,3 +102,7 @@ The container has 4 CPU cores and no GPU. The E1/E2 oracle needs about 1.6 CPU-s
   seed-5106/5107 games stopped part-way. These games are excluded; paired contrasts use, per model, the seeds on
   which every policy finished (6–7 seeds). No E2 top-up was run, so that E4 keeps its budget.
 - **E1/E2 oracle.** Run after the API phase with `llm.add_oracle` (E2 with one worker while Intelif played).
+- **Score metric (07:31 UTC, after seeing E2's seed 5106; before analyzing E1 or E5).** On seed 5106 the
+  beam-search reference bot itself scored only 10 points, so per-seed ratios explode (an agent scoring 51 gets
+  5.1). Score relative to the bot is therefore pooled over seeds, (Σ score − Σ random) / (Σ beam − Σ random), with
+  a bootstrap over seeds; the mean of per-seed ratios is kept in the summaries for reference.

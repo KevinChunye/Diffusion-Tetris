@@ -54,6 +54,22 @@ def _complete(st: pd.DataFrame, ep: pd.DataFrame):
     return st[keep_st], ep[~ep.index.isin(bad.index)], bad[["arm", "episode_seed", "pieces_placed"]]
 
 
+def _pooled(g: pd.DataFrame) -> float:
+    """Score relative to the beam-search bot pooled over seeds: (sum score - sum random) / (sum beam - sum random).
+    A per-seed ratio explodes on seeds where the bot itself tops out early (e.g. beam 10 points), so seeds are
+    pooled before dividing."""
+    den = (g["ref_beam_score"] - g["ref_random_score"]).sum()
+    return float((g["score"] - g["ref_random_score"]).sum() / den) if den > 0 else float("nan")
+
+
+def _boot_pooled(g: pd.DataFrame):
+    if len(g) < 2:
+        return (np.nan, np.nan)
+    idx = np.arange(len(g))
+    reps = [_pooled(g.iloc[RNG.choice(idx, len(idx), replace=True)]) for _ in range(B)]
+    return tuple(np.nanquantile(reps, [0.025, 0.975]))
+
+
 def _spearman(x, y) -> float:
     return float(pd.Series(x).rank().corr(pd.Series(y).rank()))
 
@@ -70,10 +86,11 @@ def ladder(run_dir: str) -> dict:
     rows = []
     for arm, g in ep.groupby("arm"):
         model = g["model"].iloc[0]
-        lo, hi = _boot_mean(g["norm_score"])
+        lo, hi = _boot_pooled(g)
         dec = g["decisions"].sum()
         rows.append({"arm": arm, "model": model, "seeds": len(g), "decisions": int(dec),
-                     "norm_score": g["norm_score"].mean(), "norm_score_lo": lo, "norm_score_hi": hi,
+                     "norm_score": _pooled(g), "norm_score_lo": lo, "norm_score_hi": hi,
+                     "norm_score_mean_of_ratios": g["norm_score"].mean(),
                      "lines": g["lines_cleared"].mean(), "pieces": g["pieces_placed"].mean(),
                      "regret_beam": float(np.average(g["regret_beam"], weights=g["decisions"])),
                      "usd_per_100_stated": 100 * g["usd_stated"].sum() / dec, "usd_per_100_full": 100 * g["usd_full"].sum() / dec,
@@ -82,16 +99,18 @@ def ladder(run_dir: str) -> dict:
     s = pd.DataFrame(rows).sort_values("norm_score", ascending=False)
     # rank correlations, bootstrapped over seeds (same resampled seeds for every arm)
     seeds = sorted(ep["episode_seed"].unique())
-    piv = ep.pivot_table(index="episode_seed", columns="arm", values="norm_score")
-    arms = list(piv.columns)
+    num = ep.assign(v=ep["score"] - ep["ref_random_score"]).pivot_table(index="episode_seed", columns="arm", values="v")
+    den = ep.assign(v=ep["ref_beam_score"] - ep["ref_random_score"]).pivot_table(index="episode_seed", columns="arm", values="v")
+    arms = list(num.columns)
     meta = s.set_index("arm").loc[arms]
     stats = {}
+    pooled = lambda pick: (num.loc[pick].sum() / den.loc[pick].sum()).values
     for name, x in (("price_stated", meta["usd_per_100_stated"]), ("total_params", meta["total_b"]), ("active_params", meta["active_b"])):
-        point = _spearman(x.values, piv.mean().values)
+        point = _spearman(x.values, pooled(seeds))
         reps = []
         for _ in range(B):
             pick = RNG.choice(seeds, len(seeds), replace=True)
-            reps.append(_spearman(x.values, piv.loc[pick].mean().values))
+            reps.append(_spearman(x.values, pooled(pick)))
         stats[name] = {"rho": point, "lo": float(np.quantile(reps, 0.025)), "hi": float(np.quantile(reps, 0.975))}
     s.to_csv(d / "summary_scaleup.csv", index=False)
     out = {"arms": len(s), "seeds": len(seeds), "decisions": int(s["decisions"].sum()), "spearman_vs_score": stats,
@@ -125,7 +144,8 @@ def memory(run_dir: str) -> dict:
                      "cached_frac": float(np.average(g["cached_frac"], weights=g["decisions"])),
                      "regret": float(np.average(g["regret"], weights=g["decisions"])),
                      "usd_per_100_stated": 100 * g["usd_stated"].sum() / dec, "usd_per_100_full": 100 * g["usd_full"].sum() / dec,
-                     "norm_score": float(e["norm_score"].mean()), "pieces": float(e["pieces_placed"].mean())})
+                     "norm_score": _pooled(e), "norm_score_mean_of_ratios": float(e["norm_score"].mean()),
+                     "pieces": float(e["pieces_placed"].mean())})
     s = pd.DataFrame(rows)
     # paired by seed: regret(append) - regret(stateless); uncached(window8) / uncached(append)
     paired = {}
@@ -176,7 +196,8 @@ def intelif(run_dir: str, workers: int = 3) -> dict:
     reg = st.groupby("episode_seed").agg(regret_beam=("regret_beam", "mean"), top1_beam=("top1_beam", "mean"))
     ep = ep.merge(reg.reset_index(), on="episode_seed", how="left")
     ep.to_csv(d / "episodes_scored.csv", index=False)
-    out = {"episodes": len(ep), "decisions": int(len(st)), "norm_score": float(ep["norm_score"].mean()),
+    out = {"episodes": len(ep), "decisions": int(len(st)), "norm_score": _pooled(ep),
+           "norm_score_mean_of_ratios": float(ep["norm_score"].mean()),
            "top1_beam": float(st["top1_beam"].mean()),
            "regret_beam": float(st["regret_beam"].mean()), "latency_p50_s": float(st["latency_s"].median()),
            "input_tokens_mean": float(st["input_tokens"].mean()), "legal_rate": 1.0}
