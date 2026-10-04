@@ -404,6 +404,78 @@ def fig_memory2() -> None:
 
 
 
+# ---- Figure: the decision model as served (E5) ------------------------------------------------------
+
+def fig_decision() -> None:
+    d = INTELIF_DIR
+    st = pd.read_csv(d / "steps.csv")
+    ep = pd.read_csv(d / "episodes_scored.csv") if (d / "episodes_scored.csv").exists() else pd.read_csv(d / "episodes.csv")
+    seeds = sorted(ep["episode_seed"].unique())
+    it6 = pd.read_csv(RUNS / "iter06" / "episodes.csv")
+    it6 = it6[it6["episode_seed"].isin(seeds)]
+    fig = plt.figure(figsize=(W, 2.45))
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.62, 0.8, 0.95], wspace=0.5)
+    ax, ax2, ax3 = fig.add_subplot(gs[0]), fig.add_subplot(gs[2]), fig.add_subplot(gs[3])
+    # (a) CPU latency against prompt length
+    ax.plot(st["input_tokens"], st["latency_s"], "o", ms=2.2, color=INK, alpha=0.35, mec="none")
+    k = float(np.median(st["latency_s"] / st["input_tokens"]))
+    xs = np.array([300, 1400])
+    ax.plot(xs, xs * k, color=INK2, lw=0.9)
+    ax.text(1400, 1400 * k * 1.12, f"{k * 1000:.0f} ms / token", ha="right", va="bottom", fontsize=6.8, color=INK2)
+    ax.axhline(0.04, color=MODEL["gpt-oss-120b"], lw=0.9, ls=(0, (3, 2)))
+    ax.text(310, 0.047, "reported, one GPU: ~40 ms", fontsize=6.5, color=INK2, va="bottom")
+    llm_p50 = float(pd.read_csv(RUNS / "iter06" / "steps.csv").query("arm == 'gemma-4-31B/direct'")["latency_s"].median())
+    ax.axhline(llm_p50, color=MODEL["gemma-4-31B"], lw=0.9, ls=(0, (3, 2)))
+    ax.text(310, llm_p50 * 1.18, f"gemma-4-31B, API: {llm_p50:.1f} s", fontsize=6.5, color=INK2, va="bottom")
+    ax.set_yscale("log")
+    ax.set_yticks([0.01, 0.1, 1, 10, 100])
+    ax.set_yticklabels(["0.01", "0.1", "1", "10", "100"])
+    ax.set_ylim(0.012, 150)
+    ax.set_xlim(280, 1450)
+    ax.set_xlabel("input tokens per decision")
+    ax.set_ylabel("seconds per decision (log)")
+    ax.set_title("a  Intelif on a 4-core CPU", pad=7)
+    # (b) score on the same games
+    pool = lambda g: float((g["score"] - g["ref_random_score"]).sum() / (g["ref_beam_score"] - g["ref_random_score"]).sum())
+    per = it6.groupby("arm").apply(pool).sort_values()
+    rows = [(ARM_LABEL.get(a, a), v, _arm_color(a)) for a, v in per.items()]
+    rows.append(("Intelif (decision model)", pool(ep), INK))
+    rows.sort(key=lambda r: r[1])
+    for i, (name, v, col) in enumerate(rows):
+        marker = "D" if name.startswith("Intelif") else "o"
+        ax2.plot([v], [i], marker, ms=5.5 if marker == "o" else 5, color=col, mec="white", mew=1.0, zorder=3)
+    ax2.set_yticks(range(len(rows)))
+    ax2.set_yticklabels([r[0] for r in rows], fontsize=6.6)
+    for lbl in ax2.get_yticklabels():
+        if lbl.get_text().startswith("Intelif"):
+            lbl.set_fontweight("bold")
+    ax2.set_ylim(-0.7, len(rows) - 0.3)
+    ax2.set_xlim(-0.03, 1.1)
+    ax2.axvline(1.0, color=INK2, lw=0.7)
+    ax2.set_xlabel("score relative to beam search")
+    ax2.set_title(f"b  Same {len(seeds)} games", pad=7)
+    ax2.grid(axis="y", visible=False)
+    # (c) does the top option's probability track move quality?
+    if "regret_beam" in st:
+        st["pbin"] = pd.qcut(st["top_prob"], 4, duplicates="drop")
+        g = st.groupby("pbin", observed=True).agg(p=("top_prob", "median"), regret=("regret_beam", "mean"),
+                                                   best=("top1_beam", "mean"), n=("turn", "size"))
+        ax3.plot(g["p"], g["regret"], color=INK, lw=1.6)
+        for x, y in zip(g["p"], g["regret"]):
+            _dot(ax3, x, y, INK, size=5)
+        ax3.set_xlabel("probability of the chosen move")
+        ax3.set_ylabel("oracle regret per move")
+        ax3.set_ylim(bottom=0)
+        ax3.set_title("c  Confidence vs quality", pad=7)
+        FACTS["decision_calibration"] = g.reset_index(drop=True).round(4).to_dict("records")
+    _save(fig, "decision")
+    FACTS["decision"] = {"ms_per_token": round(k * 1000, 2), "latency_p50_s": float(st["latency_s"].median()),
+                         "input_tokens_mean": float(st["input_tokens"].mean()), "decisions": int(len(st)),
+                         "episodes": ep.round(4).to_dict("records"), "llm_same_seeds": per.round(4).to_dict(),
+                         "gemma_api_latency_p50_s": llm_p50}
+
+
+
 # ---- Figures: how many agent contexts a deployment keeps warm (E3 capacity sweep) ---------------
 
 CAP_DIRS = [d for d in (RUNS / "scaleup" / f"capacity{x}" for x in ("", "_part2", "_part3")) if (d / "rows.jsonl").exists()]

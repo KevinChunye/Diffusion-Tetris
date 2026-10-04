@@ -187,7 +187,7 @@ def intelif(run_dir: str, workers: int = 3) -> dict:
     d = Path(run_dir)
     st = pd.read_csv(d / "steps.csv")
     if "regret_beam" not in st:
-        st = compute_regrets(st, workers=workers, n_samples=2, depth=4, beam_h=2, beam_w=4, beam_samples=1)
+        st = compute_regrets(st.drop(columns=["n_legal"], errors="ignore"), workers=workers, n_samples=2, depth=4, beam_h=2, beam_w=4, beam_samples=1)
         st["top1_beam"] = (st["rank_beam"] == 1).astype(float)
         st.to_csv(d / "steps.csv", index=False)
     ep = pd.read_csv(d / "episodes.csv").rename(columns={"lines": "lines_cleared", "pieces": "pieces_placed"})
