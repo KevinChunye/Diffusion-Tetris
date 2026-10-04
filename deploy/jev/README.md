@@ -1,4 +1,4 @@
-# Playing the paper's Tetris games with Jev
+# Playing the same Tetris games with Jev (optional, not part of the paper)
 
 Jev (TypeSafe) is a hosted decision model: it runs on TypeSafe's servers and is reached through
 `POST https://api.typesafe.ai/v1/systemone`. Nothing heavy runs on your machine; this folder packages the
@@ -53,8 +53,7 @@ session; Option B then runs as-is (the endpoint is reachable from the container)
 Commit `runs/explore/scaleup/jev/` (not `jev.env`) and push. Then, anywhere with the repository:
 
 ```bash
-python -m llm.scaleup_analysis decision runs/explore/scaleup/jev   # oracle regret and scores
-python paper/build.py                                              # the paper adds Jev to Figure 6 and Section 6.5
+python -m llm.scaleup_analysis decision runs/explore/scaleup/jev   # oracle regret and scores, comparable to Intelif's
 ```
 
 Latency measured this way includes your network round trip to TypeSafe, which is the latency an agent
@@ -63,5 +62,5 @@ on your machine actually sees.
 ## The Jev lab app (optional)
 
 `github.com/cobusgreyling/Jev` is an unofficial companion app (a local web UI on port 7872) for exploring
-Jev's Choice/Score/Noul questions with the same key. It is not needed for the paper's measurements; if you
+Jev's Choice/Score/Noul questions with the same key. It is not needed for these measurements; if you
 run it on a server, keep it behind a reverse proxy (Caddy or Nginx) and never expose the key.

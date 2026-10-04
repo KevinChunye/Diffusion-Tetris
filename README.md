@@ -16,7 +16,6 @@ The repository holds two studies that share one Tetris engine (`TetrisGame_updat
 | **Diffusion-MPC in discrete domains** (the paper above) | `diffusion/`, `experiments/`, `configs/`, `train*.py`, [Quick Start](#quick-start) |
 | **Evaluating Agents as Served, Not as Weights** (open-weight and decision-model agents on a serverless API and a CPU) | paper: [`paper/paper.pdf`](paper/paper.pdf) (LaTeX source in `paper/latex/`); code: `llm/`, `harness/`; raw logs: [`runs/explore/`](runs/explore/README.md) |
 | Animations of the agents playing identical games | [`gallery/`](gallery/README.md) |
-| Running the hosted Jev decision model on the same games (Docker or plain Python, laptop-sized) | [`deploy/jev/`](deploy/jev/README.md) |
 | Plans, deviation logs, design notes | [`notes/`](notes/README.md) |
 
 ---

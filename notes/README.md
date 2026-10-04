@@ -7,7 +7,7 @@ nothing here is needed to run the code.
 
 | File | What it is |
 |:--|:--|
-| [`scaleup_plan.md`](scaleup_plan.md) | Plans and hypotheses for experiments E1–E5, written before any data, with every later deviation and its UTC timestamp (Appendix A of the paper) |
+| [`scaleup_plan.md`](scaleup_plan.md) | Plans and hypotheses for experiments E1–E5, written before any data, with every later deviation and its UTC timestamp |
 | [`model_architectures.md`](model_architectures.md) | Architecture facts for the nine served models, each with its source (Table 2) |
 | [`decision_models.md`](decision_models.md) | Verified facts on Jev and Intelif: API format, pricing, licenses, reported latency |
 | [`references_scaleup.md`](references_scaleup.md) | How each reference was checked |

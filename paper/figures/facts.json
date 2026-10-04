@@ -1791,8 +1791,7 @@
    "gpt-oss-120b (medium)": 0.7579,
    "Kimi-K2.7": 0.8492,
    "gemma-4-31B": 0.877
-  },
-  "jev_present": false
+  }
  },
  "calls_by_experiment": {
   "E1": {

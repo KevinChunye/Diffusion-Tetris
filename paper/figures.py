@@ -121,7 +121,7 @@ def fig_ladder() -> None:
         a.set_xscale("log")
         a.axhline(1.0, color=INK2, lw=0.7, zorder=1)
         a.set_ylim(-0.03, 1.1)
-    off_a = {"gpt-oss-120b/medium": (0, 11), "GLM-5.2/direct": (-5, 0), "Qwen3.5-397B/direct": (5, -5),
+    off_a = {"gpt-oss-120b/medium": (0, 7), "GLM-5.2/direct": (-5, 0), "Qwen3.5-397B/direct": (5, -5),
              "Kimi-K2.7/direct": (5, 4), "Qwen3.8-27B/direct": (5, 3)}
     off_b = {"gpt-oss-120b/low": (5, 6), "GLM-5.2/direct": (-5, 0), "Kimi-K2.7/direct": (-5, 0),
              "DeepSeek-V4-Flash/direct": (-5, 0), "Qwen3.5-397B/direct": (5, 5), "Qwen3.8-27B/direct": (5, -5)}
@@ -136,17 +136,17 @@ def fig_ladder() -> None:
                 continue  # same model and size as gpt-oss-120b; labeled once in panel b
             dx, dy = off.get(r["arm"], (5, 0))
             text = ARM_LABEL[r["arm"]]
-            if a is ax and r["arm"] == "GLM-5.2/direct":
-                text = "GLM-5.2: priciest, plays worst"
             if a is ax and r["arm"] == "gpt-oss-120b/low":
                 text = "gpt-oss-120b: best at $0.015"
-            _label(a, x, r["norm_score"], text, dx, dy, color=INK if hl else INK2, size=6.6)
+            # labels sit beside the dot, or above the interval bar when the space beside it is taken
+            y = r["norm_score_hi"] if (a is ax and r["arm"] == "gpt-oss-120b/medium") else r["norm_score"]
+            _label(a, x, y, text, dx, dy, color=INK if hl else INK2, size=6.6)
     _log_ticks(ax, "x", [0.005, 0.01, 0.02, 0.05, 0.1, 0.2], lambda t: f"${t:g}")
     _log_ticks(ax2, "x", [20, 50, 100, 200, 500, 1000], lambda t: f"{t:g}B")
     sp = an["spearman_vs_score"]
     for a, key, name in ((ax, "price_stated", "price"), (ax2, "total_params", "size")):
-        a.text(0.02, 0.04, f"rank correlation with {name}: {sp[key]['rho']:+.2f}\n95% interval [{sp[key]['lo']:+.2f}, {sp[key]['hi']:+.2f}]",
-               transform=a.transAxes, fontsize=6.6, color=INK2, va="bottom")
+        a.text(0.02, 0.86, f"rank correlation with {name}: {sp[key]['rho']:+.2f}\n95% interval [{sp[key]['lo']:+.2f}, {sp[key]['hi']:+.2f}]",
+               transform=a.transAxes, fontsize=6.6, color=INK2, va="top")
         a.text(0.98, 1.0, "beam-search bot", transform=a.get_yaxis_transform(), ha="right", va="bottom", fontsize=6.6,
                color=INK2)
     ax.set_xlabel("$ per 100 decisions (log)")
@@ -254,16 +254,9 @@ def fig_capacity() -> None:
     ax.set_yticklabels(["0%", "50%", "100%"])
     ax.set_ylabel("contexts still cached")
     ax.set_title("a  Warm after 30 s idle")
-    gem = s[(s["model"] == "google/gemma-4-31B-it")].set_index("load")["hit_rate"]
-    ax.text(1.05, 52, f"gemma:\n{gem[16]:.0%} at 16,\n{gem[32]:.0%} at 32", fontsize=6.3, color=INK2, va="center")
-    ax.text(1.05, 18, "DeepSeek: 4", fontsize=6.3, color=INK2, va="center")
     ax2.set_ylabel("thousand tokens / s")
     ax2.set_title("b  Prefill throughput")
     ax2.set_ylim(0, 35)
-    at8 = {m: s[(s["model"] == m) & (s["load"] == 8)]["prefill_tok_per_s"].iloc[0] / 1000 for m in CAP_MAIN}
-    _label(ax2, 8, at8["openai/gpt-oss-20b"], "gpt-oss-20b", -4, 5, ha="right", size=6.3, color=INK2)
-    _label(ax2, 8, at8["MiniMaxAI/MiniMax-M2.5"], "MiniMax", 0, 6, size=6.3, color=INK2)
-    _label(ax2, 8, at8["google/gemma-4-31B-it"], "gemma, DeepSeek", 0, 7, size=6.3, color=INK2)
     ax2.set_xlim(0.8, 64 * 1.25)
     r = lambda x, y: x.rank().corr(y.rank())
     for a, col, xlabel, title, xs in ((ax3, "kv_mb_per_ctx", "KV per context, MB (log)", "c  Not set by KV size", 1),
@@ -285,10 +278,11 @@ def fig_capacity() -> None:
         a.set_ylabel("contexts kept warm")
         a.set_title(title)
         rho = r(c["capacity"], c[col])
-        a.text(0.04, 0.95, f"$\\rho$ = {rho:+.2f}", transform=a.transAxes, fontsize=7, color=INK, va="top")
-    _log_ticks(ax3, "x", [20, 50, 100, 200, 500, 1000], lambda t: f"{t:g}")
+        at = (0.96, 0.05, "right", "bottom") if a is ax3 else (0.04, 0.95, "left", "top")
+        a.text(at[0], at[1], f"$\\rho$ = {rho:+.2f}", transform=a.transAxes, fontsize=7, color=INK, ha=at[2], va=at[3])
+    _log_ticks(ax3, "x", [20, 100, 1000], lambda t: f"{t:g}")
     _log_ticks(ax4, "x", [2, 5, 10, 20], lambda t: f"{t:g}")
-    for name, a, col, xs, dx, dy in (("DeepSeek-V4-Flash", ax3, "kv_mb_per_ctx", 1, 4, 0), ("MiniMax-M2.5", ax3, "kv_mb_per_ctx", 1, -5, 0),
+    for name, a, col, xs, dx, dy in (("DeepSeek-V4-Flash", ax3, "kv_mb_per_ctx", 1, 4, 0), ("MiniMax-M2.5", ax3, "kv_mb_per_ctx", 1, -3, -8),
                                      ("DeepSeek-V4-Flash", ax4, "peak", 1000, 4, 0), ("GLM-5.2", ax4, "peak", 1000, 0, 8)):
         row = c[c["model"].map(SHORT) == name].iloc[0]
         _label(a, row[col] / xs, row["capacity"], name.replace("-V4-Flash", "").replace("-M2.5", ""), dx, dy, size=6.3, color=INK2)
@@ -309,7 +303,8 @@ def fig_capacity() -> None:
 def fig_capacity_all() -> None:
     raw, df, s, c, ctx = _capacity_data()
     order = c.sort_values(["capacity", "cold_p50_s"], ascending=[False, True])["model"].tolist()
-    fig, axes = plt.subplots(3, 3, figsize=(FULL, 4.2), sharex=True, sharey=True, gridspec_kw={"hspace": 0.5, "wspace": 0.1})
+    # drawn at its printed size (no scaling in LaTeX), so text stays at 6.5-7.5 pt
+    fig, axes = plt.subplots(3, 3, figsize=(6.2, 2.45), sharex=True, sharey=True, gridspec_kw={"hspace": 0.7, "wspace": 0.1})
     for ax, m in zip(axes.flat, order):
         g = s[s["model"] == m].sort_values("load")
         ax.fill_between(g["load"], g["hit_lo"] * 100, g["hit_hi"] * 100, color=GRID, lw=0, zorder=1)
@@ -318,10 +313,10 @@ def fig_capacity_all() -> None:
         if g["errors"].sum():
             ax.plot(g["load"], g["err_rate"] * 100, color=RED, lw=1.1, zorder=2)
         cc = c[c["model"] == m].iloc[0]
-        basis = "" if g["hit_basis"].iloc[0] == "reported" else " (hits from latency)"
-        ax.set_title(f"{SHORT[m]}{basis}", fontsize=7.5)
-        ax.text(0.04, 0.1, f"keeps {cc['capacity']}" + ("+" if cc["censored"] else ""), transform=ax.transAxes,
-                fontsize=6.8, color=INK2)
+        basis = "" if g["hit_basis"].iloc[0] == "reported" else ", inferred hits"
+        ax.set_title(f"{SHORT[m]}{basis}", fontsize=7.2, pad=4)
+        ax.text(0.04, 0.12, f"keeps {cc['capacity']}" + ("+" if cc["censored"] else ""), transform=ax.transAxes,
+                fontsize=6.5, color=INK2)
     for ax in axes.flat:
         ax.set_xscale("log", base=2)
         ax.set_xticks([1, 4, 16, 64])
@@ -332,8 +327,8 @@ def fig_capacity_all() -> None:
     for ax in axes[-1]:
         ax.set_xlabel("concurrent agents")
     fig.legend([plt.Line2D([], [], color=INK, lw=1.4, marker="o", ms=3.2), plt.Line2D([], [], color=RED, lw=1.1)],
-               ["contexts still cached after 30 s (band: 95% interval)", "agents with a refused request (HTTP 429)"],
-               loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.965))
+               ["still cached after 30 s (band: 95% interval)", "agents refused (HTTP 429)"],
+               loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.97), fontsize=6.8)
     _save(fig, "capacity_all")
 
 
@@ -368,9 +363,9 @@ def fig_interference() -> None:
         p95 = gs.loc[cond, "short_p95_ttva"]
         _dot(ax, p95, 0.95, color, size=3.8, z=4)
         k = list(style).index(cond)
-        ax.plot([0.56], [0.36 - 0.12 * k], "o", ms=3.8, color=color, mec="white", mew=0.8, transform=ax.transAxes, clip_on=False)
-        ax.text(0.61, 0.36 - 0.12 * k, f"{label}: {p95:.1f} s", transform=ax.transAxes, fontsize=6.3, color=INK2, va="center")
-    ax.text(0.53, 0.48, "p95 time", transform=ax.transAxes, fontsize=6.3, color=INK2, va="center")
+        ax.plot([0.42], [0.3 - 0.11 * k], "o", ms=3.8, color=color, mec="white", mew=0.8, transform=ax.transAxes, clip_on=False)
+        ax.text(0.47, 0.3 - 0.11 * k, f"{label}: {p95:.1f} s", transform=ax.transAxes, fontsize=6.3, color=INK2, va="center")
+    ax.text(0.40, 0.41, "p95 time", transform=ax.transAxes, fontsize=6.3, color=INK2, va="center")
     ax.axhline(0.95, color=GRID, lw=0.8, zorder=0)
     ax.set_xscale("log")
     ax.set_xlim(0.4, 30)
@@ -406,105 +401,99 @@ def fig_interference() -> None:
 
 # ---- E5: decision models as served ---------------------------------------------------------------------
 
-DECISION_RUNS = {"Intelif": RUNS / "scaleup" / "intelif_all", "Jev": RUNS / "scaleup" / "jev"}
+DECISION_DIR = RUNS / "scaleup" / "intelif_all"
 
 
-def _decision_runs():
-    out = {}
-    for name, d in DECISION_RUNS.items():
-        if (d / "steps.csv").exists() and (d / "episodes_scored.csv").exists():
-            st = pd.read_csv(d / "steps.csv")
-            if "regret_beam" in st:
-                out[name] = (d, st, pd.read_csv(d / "episodes_scored.csv"))
-    return out
+def _panel_axes(fig, i: int, n: int = 3, label_in: float = 1.0, right_in: float = 0.14,
+                bottom_in: float = 0.42, top_in: float = 0.3):
+    """Axes for panel i of n equal slots across the figure: every slot has the same label column,
+    plot width and title position, so the panels sit at identical spacing."""
+    w, h = fig.get_size_inches()
+    slot = w / n
+    ax = fig.add_axes([(i * slot + label_in) / w, bottom_in / h, (slot - label_in - right_in) / w,
+                       (h - bottom_in - top_in) / h])
+    return ax, i * slot / w, 1 - 0.1 / h
+
+
+def _row_axis(ax, labels, bold=()):
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=6.8)
+    for lbl in ax.get_yticklabels():
+        if lbl.get_text() in bold:
+            lbl.set_fontweight("bold")
+            lbl.set_color(INK)
+    ax.set_ylim(-0.6, len(labels) - 0.4)
+    ax.grid(axis="y", visible=False)
 
 
 def fig_decision() -> None:
-    runs = _decision_runs()
-    il_dir, st, ep = runs["Intelif"]
+    d = DECISION_DIR
+    st = pd.read_csv(d / "steps.csv")
+    ep = pd.read_csv(d / "episodes_scored.csv")
+    q = pd.read_csv(d / "latency_quiet.csv")
     seeds = sorted(ep["episode_seed"].unique())
     it6 = pd.read_csv(RUNS / "iter06" / "episodes.csv")
     it6 = it6[it6["episode_seed"].isin(seeds)]
-    it6_steps = pd.read_csv(RUNS / "iter06" / "steps.csv")
-    fig = plt.figure(figsize=(FULL, 2.0))
-    gs = fig.add_gridspec(1, 4, width_ratios=[1.25, 0.62, 0.8, 0.85], wspace=0.5)
-    ax, ax2, ax3 = fig.add_subplot(gs[0]), fig.add_subplot(gs[2]), fig.add_subplot(gs[3])
-    # (a) where a decision is computed sets its latency: measured rows solid, vendor/author figures hollow
-    q = pd.read_csv(il_dir / "latency_quiet.csv")
-    llm = it6_steps.groupby("arm")["latency_s"].median()
-    rows = [("Intelif, 4-core CPU", q["latency_s"].min(), q["latency_s"].max(), q["latency_s"].median(), INK, False)]
-    if "Jev" in runs:
-        jst = runs["Jev"][1]
-        rows.append(("Jev, TypeSafe API", jst["latency_s"].quantile(0.05), jst["latency_s"].quantile(0.95),
-                     jst["latency_s"].median(), RED, False))
-    rows += [("LLMs, serverless API", llm.min(), llm.max(), float(llm.median()), MODEL["gemma-4-31B"], False),
-             ("Jev (vendor figure)", 0.07, 0.5, None, MUTED, True),
-             ("Intelif, one GPU (reported)", 0.0165, 0.04, None, MUTED, True)]
-    for i, (name, lo, hi, med, col, reported) in enumerate(rows):
-        y = len(rows) - 1 - i
-        ax.plot([lo, hi], [y, y], color=col, lw=5 if not reported else 4, alpha=0.35 if not reported else 0.6,
-                solid_capstyle="butt")
+    llm = pd.read_csv(RUNS / "iter06" / "steps.csv").groupby("arm")["latency_s"].median()
+    fig = plt.figure(figsize=(FULL, 2.1))
+    (ax, xa, yt), (ax2, xb, _), (ax3, xc, _) = (_panel_axes(fig, i) for i in range(3))
+    titles = ["a  Where it runs sets its speed", "b  Same games: mid-pack", "c  Confidence is informative"]
+    for x, t in zip((xa, xb, xc), titles):
+        fig.text(x, yt, t, ha="left", va="top", fontsize=8, fontweight="bold", color=INK)
+
+    # (a) seconds per decision; measured rows carry a median dot, the reported GPU figure is a gray range only
+    rows = [("Intelif, GPU (reported)", 0.0165, 0.04, None, MUTED),
+            ("LLMs, serverless API", llm.min(), llm.max(), float(llm.median()), NEUTRAL),
+            ("Intelif, 4-core CPU", q["latency_s"].min(), q["latency_s"].max(), float(q["latency_s"].median()), INK)]
+    for y, (name, lo, hi, med, col) in enumerate(rows):
+        ax.plot([lo, hi], [y, y], color=col, lw=5, alpha=0.35 if med is not None else 0.6, solid_capstyle="butt")
         if med is None:
-            _label(ax, hi, y, f"{lo * 1000:.0f}–{hi * 1000:.0f} ms", 5, 0, size=6.4, color=INK2)
-        if med is not None:
+            _label(ax, lo, y, f"{lo * 1000:.0f}–{hi * 1000:.0f} ms", 0, 9, ha="left", size=6.6, color=INK2)
+        else:
             _dot(ax, med, y, col, size=5.2, z=4)
-            _label(ax, hi, y, f"{med:.2g} s" if med >= 1 else f"{med * 1000:.0f} ms" if med < 0.1 else f"{med:.2f} s",
-                   5, 0, size=6.4, color=INK2)
-    ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels([r[0] for r in rows][::-1], fontsize=6.6)
+            _label(ax, med, y, f"median {med:.0f} s" if med >= 10 else f"median {med:.2f} s", 0, 9, size=6.6,
+                   color=INK2)
     ax.set_xscale("log")
-    ax.set_xlim(0.01, 200)
+    ax.set_xlim(0.008, 150)
     _log_ticks(ax, "x", [0.01, 0.1, 1, 10, 100], lambda t: f"{t:g}")
-    ax.set_ylim(-0.6, len(rows) - 0.4)
-    ax.set_xlabel("s per decision (log; bar: range, dot: median)")
-    ax.set_title("a  Where it runs sets its speed")
-    ax.grid(axis="y", visible=False)
-    # (b) play on the same games
-    per = it6.groupby("arm").apply(_pool).sort_values()
+    _row_axis(ax, [r[0] for r in rows], bold=("Intelif, 4-core CPU",))
+    ax.set_xlabel("seconds per decision (log)")
+
+    # (b) score relative to the beam-search bot on the same three games
+    per = it6.groupby("arm").apply(_pool)
     pts = [(ARM_LABEL.get(a, a), v, _arm_color(a) or MUTED, "o") for a, v in per.items()]
     pts.append(("Intelif", _pool(ep), INK, "D"))
-    if "Jev" in runs:
-        pts.append(("Jev", _pool(runs["Jev"][2]), RED, "D"))
     pts.sort(key=lambda r: r[1])
     for i, (name, v, col, mk) in enumerate(pts):
         _dot(ax2, v, i, col, size=4.8 if mk == "o" else 4.6, marker=mk)
-    ax2.set_yticks(range(len(pts)))
-    ax2.set_yticklabels([p[0] for p in pts], fontsize=6.6)
-    for lbl in ax2.get_yticklabels():
-        if lbl.get_text() in ("Intelif", "Jev"):
-            lbl.set_fontweight("bold")
-    ax2.set_ylim(-0.7, len(pts) - 0.3)
+    _row_axis(ax2, [p[0] for p in pts], bold=("Intelif",))
     ax2.set_xlim(-0.04, 1.08)
     ax2.axvline(1.0, color=INK2, lw=0.7)
     ax2.set_xticks([0, 0.5, 1])
     ax2.set_xticklabels(["0", "0.5", "bot"])
-    ax2.set_xlabel("score vs. beam-search bot")
-    ax2.set_title("b  Same games: mid-pack")
-    ax2.grid(axis="y", visible=False)
-    # (c) confidence vs choosing the oracle's best move
+    ax2.set_xlabel("score relative to beam-search bot")
+
+    # (c) how often the choice was the oracle's best move, by quarter of the probability given to it
     st = st.copy()
     st["pbin"] = pd.qcut(st["top_prob"], 4, duplicates="drop")
     g = st.groupby("pbin", observed=True).agg(p=("top_prob", "median"), regret=("regret_beam", "mean"),
                                                best=("top1_beam", "mean"), n=("turn", "size")).reset_index(drop=True)
-    ax3.bar(range(len(g)), g["best"] * 100, color=[CONTEXT] * (len(g) - 1) + [INK], width=0.6)
+    labels = [f"p ≈ {p:.2f}" for p in g["p"]]
+    labels[0], labels[-1] = f"least sure, p ≈ {g['p'].iloc[0]:.2f}", f"most sure, p ≈ {g['p'].iloc[-1]:.2f}"
+    ax3.barh(range(len(g)), g["best"] * 100, height=0.42, color=[CONTEXT] * (len(g) - 1) + [INK])
     for i, v in enumerate(g["best"] * 100):
-        ax3.text(i, v + 2, f"{v:.0f}%", ha="center", va="bottom", fontsize=6.6, color=INK2)
-    ax3.set_xticks(range(len(g)))
-    ax3.set_xticklabels([f"{x:.2f}" for x in g["p"]])
-    ax3.set_ylim(0, 68)
-    ax3.set_yticks([0, 20, 40, 60])
-    ax3.set_yticklabels(["0%", "20%", "40%", "60%"])
-    ax3.set_xlabel("p(choice), quartile median")
-    ax3.set_ylabel("oracle's best move")
-    ax3.set_title("c  Confidence is informative")
-    ax3.grid(axis="x", visible=False)
+        _label(ax3, v, i, f"{v:.0f}%", 4, 0, size=6.6, color=INK2)
+    _row_axis(ax3, labels, bold=(labels[-1],))
+    ax3.set_xlim(0, 72)
+    ax3.set_xticks([0, 20, 40, 60])
+    ax3.set_xticklabels(["0%", "20%", "40%", "60%"])
+    ax3.set_xlabel("chose the oracle's best move")
     _save(fig, "decision")
     FACTS["decision_calibration"] = g.round(4).to_dict("records")
     FACTS["decision"] = {"intelif_quiet_p50_s": float(q["latency_s"].median()), "intelif_quiet_min_s": float(q["latency_s"].min()),
                          "intelif_quiet_max_s": float(q["latency_s"].max()),
                          "intelif_ms_per_token": float(1000 * (q["latency_s"] / q["input_tokens"]).median()),
-                         "llm_api_median_s": float(llm.median()), "same_games_scores": {p[0]: round(p[1], 4) for p in pts},
-                         "jev_present": "Jev" in runs}
+                         "llm_api_median_s": float(llm.median()), "same_games_scores": {p[0]: round(p[1], 4) for p in pts}}
 
 
 # ---- calls and cost per experiment (appendix table) ----------------------------------------------------
