@@ -1,6 +1,6 @@
 # Raw logs of the serving study
 
-Everything the paper *Evaluating Agents as Served, Not as Weights* reports is computed from the files here.
+Everything the paper *Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served* reports is computed from the files here.
 Every model call was logged raw (request metadata, status, reported tokens, cached tokens, latency, response
 text), so any number or figure can be recomputed, and new analyses need no new calls.
 

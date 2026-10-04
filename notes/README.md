@@ -3,7 +3,7 @@
 Plans, logs and verified facts behind the two studies in this repository. Files are grouped by study;
 nothing here is needed to run the code.
 
-## Evaluating Agents as Served, Not as Weights (`paper/paper.pdf`)
+## Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served (`paper/paper.pdf`)
 
 | File | What it is |
 |:--|:--|

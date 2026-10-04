@@ -16,17 +16,17 @@
 \usepackage{amssymb}
 \usepackage[capitalize,noabbrev]{cleveref}
 \graphicspath{{../figures/}}
-\hypersetup{pdftitle={Evaluating Agents as Served, Not as Weights}, pdfauthor={Haochuan Wang}}
+\hypersetup{pdftitle={Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served}, pdfauthor={Haochuan Wang}}
 
 
 \newcommand{\tsc}[1]{\texttt{#1}}
-\icmltitlerunning{Evaluating Agents as Served, Not as Weights}
+\icmltitlerunning{Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served}
 \raggedbottom
 
 \begin{document}
 
 \twocolumn[
-  \icmltitle{Evaluating Agents as Served, Not as Weights}
+  \icmltitle{Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served}
   \begin{icmlauthorlist}
     \icmlauthor{Haochuan Wang}{mit}
   \end{icmlauthorlist}
@@ -45,7 +45,7 @@
 \printAffiliationsAndNotice{}
 
 \begin{abstract}
-An agent meets a model as served: through an endpoint with a price card, a shared cache and other tenants, or on whatever hardware a self-hosted model runs. Benchmarks rank the weights. We measure what agents get from models as served, using Tetris as an exact instrument: every move is scored against an oracle and every agent receives the same pieces. In five pre-specified experiments with nine open-weight models on one serverless provider, plus an open decision model self-hosted on a CPU, we find that price and size do not predict decision quality; that resending history costs almost nothing when cached input is free, would cost eleven to twelve times more if it were not, and makes play worse; that deployments keep between 4 and more than 64 agent contexts warm, in line with their throughput rather than the model's KV-cache size; that an agent's own long requests slow its slowest short decisions more than tenfold, which a simple admission rule cuts by 59\% without hurting play; and that the decision model plays mid-pack but takes 27\,s per move on a CPU, about 650 times longer than reported on a GPU. Architecture predicts some of what an agent sees; the deployment sets the rest.
+An agent meets a model as served: through an endpoint with a price card, a shared cache and other tenants, or on whatever hardware a self-hosted model runs. Benchmarks rank the weights. We introduce a Tetris benchmark that measures what agents get from models as served: every move is scored against an oracle, and every agent receives the same pieces. In five pre-specified experiments with nine open-weight models on one serverless provider, plus an open decision model self-hosted on a CPU, we find that price and size do not predict decision quality; that resending history costs almost nothing when cached input is free, would cost eleven to twelve times more if it were not, and makes play worse; that deployments keep between 4 and more than 64 agent contexts warm, in line with their throughput rather than the model's KV-cache size; that an agent's own long requests slow its slowest short decisions more than tenfold, which a simple admission rule cuts by 59\% without hurting play; and that the decision model plays mid-pack but takes 27\,s per move on a CPU, about 650 times longer than reported on a GPU. Architecture predicts some of what an agent sees; the deployment sets the rest.
 \end{abstract}
 
 \section{Introduction}
@@ -54,14 +54,14 @@ An agent built on a language model rarely runs the model itself. It calls an end
 
 Evaluations mostly rank the weights. Agent and game benchmarks report task quality through an API and treat serving as fixed; serving systems are evaluated on servers their authors control, with quality held constant. For open-weight models the gap is sharpest: one checkpoint can be served by many providers, quantized, cached and priced differently. A newer kind of model widens it. Decision models such as the open Intelif do not generate text; they score a caller's options in one forward pass \citep{intelif}. Their appeal is speed, and speed is a property of where a model runs.
 
-We measure what agents get from models as served, from the only place an agent stands: the client side. Tetris is the instrument \citep{algorta}. Every move can be scored against an oracle, every game replays exactly, and every agent can be given the same pieces (\cref{fig:teaser}). We study nine open-weight models served by one serverless provider, Tensormesh, and Intelif self-hosted on a 4-core CPU. Four findings stand out:
+We measure what agents get from models as served, from the only place an agent stands: the client side. The instrument is Tetris, the classic video game \citep{algorta}. Every move can be scored against an oracle, every game replays exactly, and every agent can be given the same pieces (\cref{fig:teaser}). We study nine open-weight models served by one serverless provider, Tensormesh, and Intelif self-hosted on a 4-core CPU. Four findings stand out:
 \begin{itemize}\setlength\itemsep{1pt}
   \item \textbf{Price and size do not buy decisions.} The most expensive model played worst; the best play came from a 117B model at \$0.015 per 100 moves.
   \item \textbf{Deployments keep 4 to more than 64 concurrent agent contexts warm.} The number follows the deployment's throughput, not the model's KV-cache size.
   \item \textbf{An agent's own long requests slow its short ones.} The 95th-percentile time to a move grows from 1\,s to 11\,s; deferring the long requests cuts it by 59\% at the same cost, on held-out data.
   \item \textbf{A decision model is fast only where it is served.} Intelif played fifth of ten agents on the same games, always legally, but took 27\,s per move on our CPU against about 40\,ms reported on one GPU.
 \end{itemize}
-Our contributions are a measurement design that separates what an agent controls, observes and cannot see (\cref{sec:setup}); five pre-specified experiments that link deployment properties to cost, latency and decision quality, read against each model's published architecture (\cref{sec:models,sec:method,sec:results}); and an open, replayable harness that plays the same games against language models and decision models alike.
+Our contributions are a measurement design that separates what an agent controls, observes and cannot see (\cref{sec:setup}); five pre-specified experiments that link deployment properties to cost, latency and decision quality, read against each model's published architecture (\cref{sec:models,sec:method,sec:results}); and an open Tetris benchmark that replays every game and plays the same games against language models and decision models alike.
 
 \section{What an Agent Can See}
 \label{sec:setup}

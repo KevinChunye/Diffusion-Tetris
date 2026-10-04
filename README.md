@@ -14,7 +14,7 @@ The repository holds two studies that share one Tetris engine (`TetrisGame_updat
 | | Where to look |
 |:--|:--|
 | **Diffusion-MPC in discrete domains** (the paper above) | `diffusion/`, `experiments/`, `configs/`, `train*.py`, [Quick Start](#quick-start) |
-| **Evaluating Agents as Served, Not as Weights** (open-weight and decision-model agents on a serverless API and a CPU) | paper: [`paper/paper.pdf`](paper/paper.pdf) (LaTeX source in `paper/latex/`); code: `llm/`, `harness/`; raw logs: [`runs/explore/`](runs/explore/README.md) |
+| **Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served** (open-weight and decision-model agents on a serverless API and a CPU) | paper: [`paper/paper.pdf`](paper/paper.pdf) (LaTeX source in `paper/latex/`); code: `llm/`, `harness/`; raw logs: [`runs/explore/`](runs/explore/README.md) |
 | Animations of the agents playing identical games | [`gallery/`](gallery/README.md) |
 | Plans, deviation logs, design notes | [`notes/`](notes/README.md) |
 
@@ -106,7 +106,7 @@ LLM bots need `TENSORMESH_API_KEY` in the environment; add `--mock` to run them 
 
 ## Serverless LLM exploration (Tensormesh, KV-cache reuse)
 
-**Paper:** [Evaluating Agents as Served, Not as Weights](paper/paper.pdf)
+**Paper:** [Same Pieces, Different Servers: A Tetris Benchmark for AI Agents as Served](paper/paper.pdf)
 ([LaTeX source](paper/latex/main.tex); `python paper/build.py` rebuilds every figure from `runs/explore/` and the PDF,
 using pdflatex and bibtex).
 
