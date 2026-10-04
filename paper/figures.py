@@ -68,143 +68,7 @@ def _short(arm: str) -> str:
     return arm.split("/")[0]
 
 
-# ---- Figure: price and size do not buy decisions (iteration 6 model ladder) ----------------------
-
-def fig_ladder() -> None:
-    s = pd.read_csv(RUNS / "iter06" / "summary.csv")
-    s["usd100"] = s["usd_per_100_pieces"]  # estimated $ per 100 placed pieces (= decisions)
-    fig, ax = plt.subplots(figsize=(W, 3.0))
-    ax.set_xscale("log")
-    ax.axhline(1.0, color=INK2, lw=0.8, zorder=1)
-    ax.text(0.0052, 1.0, "beam-search bot = 1.0", va="bottom", ha="left", fontsize=7.5, color=INK2)
-    labels = {
-        "gpt-oss-20b/low": ("gpt-oss-20b", (6, -11)), "gpt-oss-120b/low": ("gpt-oss-120b, low reasoning", (7, -3)),
-        "gpt-oss-120b/medium": ("gpt-oss-120b, medium reasoning\n8.3 s per move", (7, -6)),
-        "gemma-4-31B/direct": ("gemma-4-31B", (7, -3)), "DeepSeek-V4-Flash/direct": ("DeepSeek-V4-Flash", (7, -3)),
-        "Qwen3.8-27B/direct": ("Qwen3.8-27B", (7, -3)), "Qwen3.5-397B/direct": ("Qwen3.5-397B (largest)", (7, -3)),
-        "Kimi-K2.7/direct": ("Kimi-K2.7", (7, -3)), "GLM-5.2/direct": ("GLM-5.2 (priciest)", (-8, 6))}
-    for _, r in s.iterrows():
-        fam = _short(r["arm"]).replace("-direct", "")
-        color = next((c for k, c in MODEL.items() if fam.startswith(k)), MUTED)
-        _dot(ax, r["usd100"], r["norm_score"], color, size=7.5)
-        text, off = labels[r["arm"]]
-        ax.annotate(text, (r["usd100"], r["norm_score"]), xytext=off, textcoords="offset points",
-                    fontsize=7.5, color=INK, ha="right" if off[0] < 0 else "left", va="center")
-    ax.set_xlim(0.0045, 0.32)
-    ax.set_ylim(-0.04, 1.08)
-    ax.set_xticks([0.005, 0.01, 0.02, 0.05, 0.1, 0.2])
-    ax.set_xticklabels(["$0.005", "$0.01", "$0.02", "$0.05", "$0.10", "$0.20"])
-    ax.set_xlabel("estimated cost per 100 decisions (log scale)")
-    ax.set_ylabel("game score relative to beam search")
-    _save(fig, "ladder")
-    FACTS["ladder"] = s[["arm", "usd100", "norm_score", "norm_lines", "regret_beam", "latency_p50", "pieces"]].round(4).to_dict("records")
-
-
-# ---- Figure: the price card decides which memory is cheap (iteration 2) --------------------------
-
-def fig_memory() -> None:
-    s = pd.read_csv(RUNS / "iter02" / "summary.csv")
-    s["model"] = s["arm"].str.split("/").str[0].map({"oss20b": "gpt-oss-20b", "oss120b": "gpt-oss-120b",
-                                                     "dsv4flash": "DeepSeek-V4-Flash"})
-    s["policy"] = s["arm"].str.split("/").str[1]
-    order = ["stateless", "append", "window8"]
-    names = {"stateless": "no history", "append": "append all turns", "window8": "last 8 turns"}
-    note = {"gpt-oss-20b": "cached input $0", "gpt-oss-120b": "cached input $0", "DeepSeek-V4-Flash": "no cached price"}
-    fig, axes = plt.subplots(1, 2, figsize=(W, 2.65), gridspec_kw={"wspace": 0.55})
-    for ax, col, title, ylab, log in (
-            (axes[0], "usd_per_100_pieces", "a  Cost: the ranking flips with the price card", "$ per 100 decisions (log)", True),
-            (axes[1], "regret_beam", "b  Quality: more history plays worse", "regret per decision (lower is better)", False)):
-        if log:
-            ax.set_yscale("log")
-        for m in ["gpt-oss-20b", "gpt-oss-120b", "DeepSeek-V4-Flash"]:
-            g = s[s["model"] == m].set_index("policy").loc[order]
-            ax.plot(range(3), g[col], color=MODEL[m], lw=2)
-            for i, v in enumerate(g[col]):
-                _dot(ax, i, v, MODEL[m], size=7)
-            if not log:
-                ax.annotate(m, (2, g[col].iloc[-1]), xytext=(9, 0), textcoords="offset points", va="center",
-                            fontsize=7.5, color=INK)
-        ax.set_xticks(range(3))
-        ax.set_xticklabels([names[p] for p in order])
-        ax.set_xlim(-0.3, 2.3)
-        ax.set_title(title, pad=8)
-        ax.set_ylabel(ylab)
-        ax.grid(axis="x", visible=False)
-    axes[0].set_yticks([0.005, 0.01, 0.02, 0.05, 0.1, 0.2])
-    axes[0].set_yticklabels(["$0.005", "$0.01", "$0.02", "$0.05", "$0.10", "$0.20"])
-    axes[0].set_ylim(0.0045, 0.25)
-    axes[1].set_ylim(0, 4.8)
-    handles = [plt.Line2D([], [], color=MODEL[m], lw=2, marker="o", ms=5.5, mec=MODEL[m]) for m in note]
-    fig.legend(handles, [f"{m} ({note[m]})" for m in note], loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1.0),
-               handlelength=1.6, columnspacing=1.6, fontsize=7.5)
-    _save(fig, "memory")
-    FACTS["memory"] = s[["arm", "usd_per_100_pieces", "regret_beam", "cached_frac", "prompt_tok"]].round(4).to_dict("records")
-
-
-# ---- Figure: caching works everywhere, but billing and capacity differ (probe + iteration 4) -----
-
-def fig_cache() -> None:
-    c = pd.read_csv(RUNS / "probe" / "cache_16k.csv")
-    c = c[c["stream"] == True]  # noqa: E712
-    t = c.groupby(["model", "call_idx"])["ttft_s"].mean().unstack()
-    rep = c[c["call_idx"] == 1].groupby("model")["cached_tokens"].mean()
-    price = pd.read_csv(RUNS / "probe" / "models.csv") if (RUNS / "probe" / "models.csv").exists() else None
-    t = t.sort_values(0)
-    fig = plt.figure(figsize=(W, 2.9))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.45, 1, 1], wspace=0.62)
-    ax = fig.add_subplot(gs[0])
-    ax.set_xscale("log")
-    names = [m.split("/")[-1].replace("-it", "").replace("-FP8", "").replace("-NVFP4", "*").replace("-Code", "")
-             .replace("-A17B", "") for m in t.index]
-    for i, (m, row) in enumerate(t.iterrows()):
-        ax.plot([row[1], row[0]], [i, i], color=MUTED, lw=2, zorder=1)
-        ax.plot([row[0]], [i], "o", ms=7, mfc="white", mec=INK2, mew=1.4, zorder=2)
-        ax.plot([row[1]], [i], "o", ms=7, color=INK, mec="white", mew=1.4, zorder=3)
-    ax.set_yticks(range(len(t)))
-    ax.set_yticklabels(names)
-    ax.set_ylim(-0.6, len(t) - 0.4)
-    ax.grid(axis="y", visible=False)
-    ax.set_xticks([0.5, 1, 2, 5, 10])
-    ax.set_xticklabels(["0.5", "1", "2", "5", "10"])
-    ax.set_xlabel("time to first token, s (log)")
-    ax.set_title("a  16k-token prefix, cold vs repeat", pad=8)
-    ax.plot([], [], "o", ms=6, mfc="white", mec=INK2, mew=1.4, label="cold")
-    ax.plot([], [], "o", ms=6, color=INK, label="repeat")
-    ax.legend(loc="lower right", handletextpad=0.2, borderaxespad=0.2)
-
-    cap = pd.read_csv(RUNS / "iter04" / "summary_capacity.csv")
-    lab = {"deepseek-ai/DeepSeek-V4-Flash": "DeepSeek-V4-Flash", "openai/gpt-oss-20b": "gpt-oss-20b"}
-    ax2, ax3 = fig.add_subplot(gs[1]), fig.add_subplot(gs[2])
-    for m, g in cap.groupby("model"):
-        name = lab[m]
-        ax2.plot(g["contexts"], g["hit_rate"] * 100, color=MODEL[name], lw=2)
-        ax3.plot(g["contexts"], g["warm_p50"], color=MODEL[name], lw=2)
-        for x, y, z in zip(g["contexts"], g["hit_rate"] * 100, g["warm_p50"]):
-            _dot(ax2, x, y, MODEL[name], size=6.5)
-            _dot(ax3, x, z, MODEL[name], size=6.5)
-    for ax_ in (ax2, ax3):
-        ax_.set_xscale("log", base=2)
-        ax_.set_xticks([1, 4, 8, 16])
-        ax_.set_xticklabels(["1", "4", "8", "16"])
-        ax_.set_xlabel("concurrent 15k-token agents")
-    ax2.set_ylim(-8, 112)
-    ax2.set_yticks([0, 50, 100])
-    ax2.set_yticklabels(["0%", "50%", "100%"])
-    ax2.set_title("b  Still cached after 30 s", pad=8)
-    ax2.text(16, 92, "gpt-oss-20b", ha="right", va="top", fontsize=7.5, color=INK)
-    ax2.text(16, 25, "DeepSeek-\nV4-Flash", ha="right", va="bottom", fontsize=7.5, color=INK)
-    ax3.set_title("c  Time to re-serve", pad=8)
-    ax3.set_ylabel("median latency, s")
-    ax3.set_ylim(0, 26)
-    ax3.text(1.1, 17, "DeepSeek-\nV4-Flash", ha="left", va="bottom", fontsize=7.5, color=INK)
-    ax3.text(16, 4.3, "gpt-oss-20b", ha="right", va="bottom", fontsize=7.5, color=INK)
-    _save(fig, "cache")
-    FACTS["cache_16k"] = {m: {"cold_s": round(float(r[0]), 3), "repeat_s": round(float(r[1]), 3),
-                              "reported_cached": float(rep.get(m, np.nan))} for m, r in t.iterrows()}
-    FACTS["capacity"] = cap.round(3).to_dict("records")
-
-
-# ---- Figure: your own long requests slow your short ones (iteration 8 live pilot) ----------------
+# ---- Figure: your own long requests slow your short ones (E4 confirmatory run) ------------------
 
 INTERF_DIRS = [Path(x) for x in os.environ.get("INTERF_DIRS", "").split(",") if x] or \
     [RUNS / "interference" / "confirm_gemma", RUNS / "interference" / "confirm_deepseek"]
@@ -279,7 +143,7 @@ def fig_interference() -> None:
     ax3.set_ylabel("median s to first byte")
     ax3.set_title("c  Endpoint delay", pad=8)
     ax3.text(2.2, 9.0, "DeepSeek-V4-Flash", ha="right", fontsize=7.5, color=INK)
-    ax3.text(2.2, 1.0, "gemma-4-31B", ha="right", fontsize=7.5, color=INK)
+    ax3.text(1.55, 1.4, "gemma-4-31B", ha="center", fontsize=7.5, color=INK)
     ax3.grid(axis="x", visible=False)
     _save(fig, "interference")
     keep = ["model", "condition", "short_p50_ttva", "short_p95_ttva", "short_p95_queue_s", "useful_per_s",
@@ -289,10 +153,10 @@ def fig_interference() -> None:
     FACTS["verdicts"] = verdicts
 
 
-# ---- Figure: E1 model ladder at scale, with the self-hosted decision model ----------------------
+# ---- Figure: E1 model ladder at scale --------------------------------------------------------------
 
 LADDER_DIR = Path(os.environ.get("LADDER_DIR", RUNS / "scaleup" / "ladder"))
-INTELIF_DIR = Path(os.environ.get("INTELIF_DIR", RUNS / "scaleup" / "intelif"))
+INTELIF_DIR = Path(os.environ.get("INTELIF_DIR", RUNS / "scaleup" / "intelif_all"))
 ARM_LABEL = {"gpt-oss-20b/low": "gpt-oss-20b", "gpt-oss-120b/low": "gpt-oss-120b", "gpt-oss-120b/medium": "gpt-oss-120b, medium",
              "gemma-4-31B/direct": "gemma-4-31B", "DeepSeek-V4-Flash/direct": "DeepSeek-V4-Flash",
              "Qwen3.8-27B/direct": "Qwen3.8-27B", "Qwen3.5-397B/direct": "Qwen3.5-397B", "Kimi-K2.7/direct": "Kimi-K2.7",
@@ -683,10 +547,13 @@ def facts_calls() -> None:
 
 
 def main() -> None:
-    fig_ladder()
-    fig_memory()
-    fig_cache()
+    fig_ladder2()
+    fig_memory2()
+    fig_capacity_all()
+    fig_capacity()
     fig_interference()
+    fig_decision()
+    facts_calls()
     spend = pd.read_csv(RUNS / "spend.csv")
     FACTS["spend_total_usd"] = round(float(spend["cost_usd"].sum()), 4)
     FACTS["spend_by_iteration"] = spend.groupby("iteration")["cost_usd"].sum().round(4).to_dict()
