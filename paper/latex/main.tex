@@ -1,3 +1,4 @@
+\pdfoutput=1
 \documentclass{article}
 
 \usepackage{microtype}
@@ -36,19 +37,21 @@
   \vskip 0.22in
   {\begin{center}
     \includegraphics[width=0.9\textwidth]{teaser.png}
-    \captionof{figure}{\textbf{Same game, same pieces, five agents} (seed 1002, piece 60 of 100). Three open-weight language models served by Tensormesh and the Intelif decision model self-hosted on a CPU, replayed move by move from their logs, next to a beam-search bot, a classical planner that serves as the reference player (\cref{sec:method}). gpt-oss-20b and DeepSeek-V4-Flash have topped out; Intelif's stack is high, but it finishes all 100 pieces with 54 points, behind gemma-4-31B (76). Animations for more games are in the repository's \tsc{gallery/}.}
+    \captionof{figure}{\textbf{Same game, same pieces, five agents} (seed 1002, piece 60 of 100). Three open-weight language models served by Tensormesh and the Intelif decision model self-hosted on a CPU, replayed move by move from their logs, next to a beam-search bot, a classical planner that serves as the reference player (\cref{sec:method}). gpt-oss-20b and DeepSeek-V4-Flash have topped out; Intelif's stack is high, but it finishes all 100 pieces with 54 points, behind gemma-4-31B (76). Animations of more games are in the \tsc{gallery/} folder of the code repository (\cref{sec:intro}).}
     \label{fig:teaser}
   \end{center}}
   \vskip 0.15in
 ]
 
 \printAffiliationsAndNotice{}
+\setcounter{footnote}{1} % the affiliation note above is footnote 1
 
 \begin{abstract}
 An agent meets a model as served: through an endpoint with a price card, a shared cache and other tenants, or on whatever hardware a self-hosted model runs. Benchmarks rank the weights. We introduce a Tetris benchmark that measures what agents get from models as served: every move is scored against an oracle, and every agent receives the same pieces. In five pre-specified experiments with nine open-weight models on one serverless provider, plus an open decision model self-hosted on a CPU, we find that price and size do not predict decision quality; that resending history costs almost nothing when cached input is free, would cost eleven to twelve times more if it were not, and makes play worse; that deployments keep between 4 and more than 64 agent contexts warm, in line with their throughput rather than the model's KV-cache size; that an agent's own long requests slow its slowest short decisions more than tenfold, which a simple admission rule cuts by 59\% without hurting play; and that the decision model plays mid-pack but takes 27\,s per move on a CPU, about 650 times longer than reported on a GPU. Architecture predicts some of what an agent sees; the deployment sets the rest.
 \end{abstract}
 
 \section{Introduction}
+\label{sec:intro}
 
 An agent built on a language model rarely runs the model itself. It calls an endpoint, and behind the endpoint sit an inference engine, a cache, a scheduler and a price list, all shared with other tenants. The agent adds its own habits: how much history it resends, how many requests it keeps in flight, and whether long and short requests share a queue. What the agent receives, a decision of some quality at some latency and price, comes from all of these together.
 
@@ -61,7 +64,7 @@ We measure what agents get from models as served, from the only place an agent s
   \item \textbf{An agent's own long requests slow its short ones.} The 95th-percentile time to a move grows from 1\,s to 11\,s; deferring the long requests cuts it by 59\% at the same cost, on held-out data.
   \item \textbf{A decision model is fast only where it is served.} Intelif played fifth of ten agents on the same games, always legally, but took 27\,s per move on our CPU against about 40\,ms reported on one GPU.
 \end{itemize}
-Our contributions are a measurement design that separates what an agent controls, observes and cannot see (\cref{sec:setup}); five pre-specified experiments that link deployment properties to cost, latency and decision quality, read against each model's published architecture (\cref{sec:models,sec:method,sec:results}); and an open Tetris benchmark that replays every game and plays the same games against language models and decision models alike.
+Our contributions are a measurement design that separates what an agent controls, observes and cannot see (\cref{sec:setup}); five pre-specified experiments that link deployment properties to cost, latency and decision quality, read against each model's published architecture (\cref{sec:models,sec:method,sec:results}); and an open Tetris benchmark that replays every game and plays the same games against language models and decision models alike.\footnote{Code, raw logs and animations: \url{https://github.com/KevinChunye/Diffusion-Tetris}.}
 
 \section{What an Agent Can See}
 \label{sec:setup}

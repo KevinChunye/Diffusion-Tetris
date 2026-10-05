@@ -72,3 +72,4 @@ paper/latex/*.bbl
 paper/latex/*.blg
 paper/latex/*.out
 paper/latex/main.pdf
+paper/latex/*.fls
